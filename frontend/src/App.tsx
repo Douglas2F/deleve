@@ -1,0 +1,33 @@
+import { ArrowLeft, ArrowRight, Check, HeartPulse } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import Brand from "./components/Brand";
+import Dashboard, { HealthProfile } from "./components/Dashboard";
+import LandingPage from "./components/LandingPage";
+
+type Data = {name:string;heightCm:string;weightKg:string;goal:string;goals:string[];targetWeightKg:string;sleepGoalHours:string;waterGoalMl:string;exerciseDaysWeek:string};
+const start:Data={name:"",heightCm:"",weightKg:"",goal:"",goals:[],targetWeightKg:"",sleepGoalHours:"8",waterGoalMl:"2000",exerciseDaysWeek:"3"};
+
+export default function App(){
+ const [step,setStep]=useState(0),[data,setData]=useState(start),[error,setError]=useState(""),[saving,setSaving]=useState(false);
+ const [profile,setProfile]=useState<HealthProfile|null>(null);
+ useEffect(()=>{fetch("/api/health/profile").then(r=>r.ok?r.json():null).then(p=>{if(p){setProfile(p);setStep(5)}}).catch(()=>undefined)},[]);
+ const change=(key:keyof Data)=>(value:string)=>setData({...data,[key]:value});
+ const toggleGoal=(goal:string)=>{const weight=["Perder peso","Ganhar peso","Manter peso"];let goals=data.goals.includes(goal)?data.goals.filter(x=>x!==goal):[...data.goals,goal];if(weight.includes(goal)&&!data.goals.includes(goal))goals=goals.filter(x=>!weight.includes(x)||x===goal);setData({...data,goals,goal:goals.join(", ")})};
+ async function save(e:FormEvent){e.preventDefault();setSaving(true);setError("");try{const r=await fetch("/api/health/profile",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}),b=await r.json();if(!r.ok)throw new Error(b.error);setProfile(data);setStep(4)}catch(e){setError(e instanceof Error?e.message:"Não foi possível salvar.")}finally{setSaving(false)}}
+ if(step===5&&profile)return <Dashboard profile={profile}/>;
+ if(step===0)return <LandingPage onStart={()=>setStep(1)}/>;
+ return <main className="relative min-h-screen overflow-hidden bg-stone-50 text-stone-900 before:pointer-events-none before:absolute before:-right-40 before:-top-48 before:size-[32rem] before:rounded-full before:bg-gradient-to-br before:from-emerald-200/50 before:via-teal-100/30 before:to-transparent before:blur-3xl after:pointer-events-none after:absolute after:-bottom-48 after:-left-40 after:size-[30rem] after:rounded-full after:bg-gradient-to-tr after:from-cyan-100/45 after:via-emerald-50/20 after:to-transparent after:blur-3xl"><section className="relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col px-6 py-7 md:px-12">
+  <nav className="flex items-center justify-between"><Brand/>{step>0&&step<4&&<small>Etapa {step} de 3</small>}</nav>
+  {step>0&&step<4&&<form onSubmit={save} className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center py-10"><div className="mb-8 flex gap-2">{[1,2,3].map(n=><i key={n} className={`h-1.5 flex-1 rounded-full ${n<=step?"bg-emerald-700":"bg-stone-200"}`}/>)}</div>
+   {step===1&&<><Tag text="Vamos nos conhecer"/><h1 className="title">Comece pelo essencial.</h1><p className="subtitle">Usaremos apenas o necessário para personalizar seu acompanhamento.</p><Field label="Como podemos chamar você?" value={data.name} set={change("name")} placeholder="Seu nome"/><div className="grid grid-cols-2 gap-3"><Field label="Altura (cm)" value={data.heightCm} set={change("heightCm")} placeholder="175" type="number"/><Field label="Peso (kg)" value={data.weightKg} set={change("weightKg")} placeholder="78" type="number"/></div></>}
+   {step===2&&<><Tag text="Seus objetivos"/><h1 className="title">O que você quer melhorar?</h1><p className="subtitle">Escolha um ou mais objetivos. Você poderá mudar depois.</p>{["Bem-estar geral","Perder peso","Ganhar peso","Manter peso","Dormir melhor","Beber mais água","Praticar atividade física"].map(x=><button type="button" key={x} onClick={()=>toggleGoal(x)} className={`choice ${data.goals.includes(x)?"selected":""}`}><b>{x}</b><small>{data.goals.includes(x)?"Selecionado":"Toque para selecionar"}</small></button>)}</>}
+   {step===3&&<><Tag text="Metas personalizadas"/><h1 className="title">Como você quer começar?</h1><p className="subtitle">Mostramos apenas metas ligadas às suas escolhas.</p>{(data.goals.includes("Perder peso")||data.goals.includes("Ganhar peso"))&&<Field label="Peso desejado (kg)" value={data.targetWeightKg} set={change("targetWeightKg")} type="number"/>}{data.goals.includes("Dormir melhor")&&<Field label="Meta de sono (horas)" value={data.sleepGoalHours} set={change("sleepGoalHours")} type="number"/>}{data.goals.includes("Beber mais água")&&<Field label="Meta de água (ml)" value={data.waterGoalMl} set={change("waterGoalMl")} type="number"/>}{data.goals.includes("Praticar atividade física")&&<Field label="Exercícios por semana (dias)" value={data.exerciseDaysWeek} set={change("exerciseDaysWeek")} type="number"/>}{!data.goals.some(x=>["Perder peso","Ganhar peso","Dormir melhor","Beber mais água","Praticar atividade física"].includes(x))&&<p className="notice">Seu objetivo não precisa de um número agora. Você já pode continuar.</p>}<p className="notice">Estas metas servem para acompanhamento e não substituem orientação profissional.</p></>}
+   {error&&<p className="error">{error}</p>}<div className="mt-8 flex gap-3">{step>1&&<button type="button" className="back" onClick={()=>setStep(step-1)}><ArrowLeft/></button>}<button disabled={saving||!valid(step,data)} type={step===3?"submit":"button"} onClick={step<3?()=>setStep(step+1):undefined} className="next">{step===3?(saving?"Salvando...":"Concluir"):"Continuar"}<ArrowRight/></button></div>
+  </form>}
+  {step===4&&<div className="m-auto max-w-lg text-center"><span className="mx-auto grid size-16 place-items-center rounded-3xl bg-emerald-100 text-emerald-800"><Check size={30}/></span><h1 className="title mt-6">Tudo pronto, {data.name}!</h1><p className="subtitle">Seu espaço de saúde foi configurado. Um registro por vez.</p><button onClick={()=>setStep(5)} className="primary mx-auto">Ir para meu dia <ArrowRight/></button></div>}
+ </section></main>
+}
+function Tag({text}:{text:string}){return <div className="tag"><HeartPulse size={16}/>{text}</div>}
+function Field({label,value,set,placeholder,type="text"}:{label:string;value:string;set:(v:string)=>void;placeholder?:string;type?:string}){return <label className="field">{label}<input required type={type} value={value} placeholder={placeholder} onChange={e=>set(e.target.value)}/></label>}
+function Primary({children,onClick}:{children:string;onClick:()=>void}){return <button onClick={onClick} className="primary">{children}<ArrowRight/></button>}
+function valid(s:number,d:Data){return s===1?!!d.name&&+d.heightCm>=80&&+d.weightKg>=20:s===2?d.goals.length>0:true}

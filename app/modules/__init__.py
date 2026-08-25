@@ -1,0 +1,2 @@
+"""Módulos independentes da aplicação."""
+

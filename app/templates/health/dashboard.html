@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Saúde — Deleve{% endblock %}
+
+{% block content %}
+  <header class="welcome">
+    <span class="eyebrow">Deleve</span>
+    <h1>Vamos cuidar da sua saúde?</h1>
+    <p>Registros simples para acompanhar o que realmente importa no seu dia.</p>
+  </header>
+
+  <section class="health-card" aria-labelledby="health-title">
+    <div class="health-card__icon" aria-hidden="true">♥</div>
+    <div>
+      <h2 id="health-title">Módulo Saúde</h2>
+      <p>A base está pronta. O próximo passo será sua configuração inicial.</p>
+    </div>
+  </section>
+
+  <button class="primary-action" type="button" disabled>
+    Começar configuração
+    <span aria-hidden="true">→</span>
+  </button>
+  <p class="coming-soon">Disponível na próxima etapa</p>
+{% endblock %}

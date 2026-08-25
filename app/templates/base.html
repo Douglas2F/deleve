@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#256f5b">
+    <title>{% block title %}Deleve — Sua rotina, do seu jeito{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  </head>
+  <body>
+    <main class="app-shell">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>
