@@ -11,7 +11,7 @@ type WeeklyReportData = {
   summary: string;
   water: { totalMl: number; averageMl: number; goalMl: number; goalDays: number };
   sleep: { averageMinutes: number; recordedDays: number; goalMinutes: number; goalDays: number };
-  exercise: { completedDays: number; targetDays: number; totalMinutes: number; modalities: string[]; distanceByModality: DistanceTotal[] };
+  exercise: { completedDays: number; targetDays: number; totalMinutes: number; totalCalories: number; modalities: string[]; distanceByModality: DistanceTotal[] };
   weight: { currentWeightKg: number; weeklyChangeKg: number; recordedDays: number };
 };
 
@@ -54,7 +54,7 @@ export default function WeeklyReport({ open, onClose }: { open: boolean; onClose
           <section className="mt-5 grid gap-4 sm:grid-cols-2">
             <ReportCard icon={<Droplets />} color="bg-sky-100 text-sky-700" title="Água" main={`${formatNumber(report.water.averageMl)} ml por dia`} detail={`${formatNumber(report.water.totalMl)} ml na semana · meta em ${report.water.goalDays} dia${report.water.goalDays === 1 ? "" : "s"}`} />
             <ReportCard icon={<MoonStar />} color="bg-indigo-100 text-indigo-700" title="Sono" main={report.sleep.recordedDays ? `${formatDuration(report.sleep.averageMinutes)} em média` : "Sem registros"} detail={`${report.sleep.recordedDays} dia${report.sleep.recordedDays === 1 ? "" : "s"} registrado${report.sleep.recordedDays === 1 ? "" : "s"} · meta em ${report.sleep.goalDays}`} />
-            <ReportCard icon={<Activity />} color="bg-rose-100 text-rose-700" title="Exercícios" main={`${formatDuration(report.exercise.totalMinutes)} na semana`} detail={`${report.exercise.completedDays}${report.exercise.targetDays ? ` de ${report.exercise.targetDays}` : ""} dias${report.exercise.modalities.length ? ` · ${report.exercise.modalities.join(", ")}` : ""}${formatDistanceTotals(report.exercise.distanceByModality)}`} />
+            <ReportCard icon={<Activity />} color="bg-rose-100 text-rose-700" title="Exercícios" main={`${formatDuration(report.exercise.totalMinutes)} na semana`} detail={`${report.exercise.completedDays}${report.exercise.targetDays ? ` de ${report.exercise.targetDays}` : ""} dias${report.exercise.totalCalories?` · ${formatNumber(report.exercise.totalCalories)} kcal`:""}${report.exercise.modalities.length ? ` · ${report.exercise.modalities.join(", ")}` : ""}${formatDistanceTotals(report.exercise.distanceByModality)}`} />
             <ReportCard icon={<Scale />} color="bg-amber-100 text-amber-700" title="Peso" main={`${formatWeight(report.weight.currentWeightKg)} kg`} detail={report.weight.recordedDays ? `${report.weight.recordedDays} registro${report.weight.recordedDays === 1 ? "" : "s"} · ${formatChange(report.weight.weeklyChangeKg)}` : "Sem pesagem nesta semana"} />
           </section>
           <p className="mt-6 text-center text-xs leading-5 text-stone-400">Este relatório serve para acompanhamento pessoal e não substitui orientação profissional.</p>
@@ -74,4 +74,4 @@ function formatNumber(value: number) { return value.toLocaleString("pt-BR"); }
 function formatWeight(value: number) { return value.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
 function formatChange(value: number) { if (value === 0) return "sem alteração"; return `${value > 0 ? "+" : ""}${formatWeight(value)} kg na semana`; }
 function formatDistanceTotals(items: DistanceTotal[]) { if (!items.length) return ""; return ` · ${items.map((item) => `${item.type}: ${item.totalKm.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} km${formatPerformance(item)}`).join(" · ")}`; }
-function formatPerformance(item: DistanceTotal) { if (item.paceSecondsPerKm) { const minutes = Math.floor(item.paceSecondsPerKm / 60), seconds = String(item.paceSecondsPerKm % 60).padStart(2, "0"); return ` (${minutes}:${seconds} min/km)`; } if (item.averageSpeedKmh) return ` (${item.averageSpeedKmh.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km/h)`; return ""; }
+function formatPerformance(item: DistanceTotal) { if (item.paceSecondsPerKm) { const minutes = Math.floor(item.paceSecondsPerKm / 60), seconds = String(item.paceSecondsPerKm % 60).padStart(2, "0"); return ` (pace médio ${minutes}:${seconds} min/km)`; } if (item.averageSpeedKmh) return ` (velocidade média ${item.averageSpeedKmh.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km/h)`; return ""; }

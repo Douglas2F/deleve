@@ -90,6 +90,7 @@ def get_weekly_health_report(reference_date: date | None = None) -> dict:
             "completedDays": exercise["completedDays"],
             "targetDays": exercise["targetDays"],
             "totalMinutes": exercise["totalMinutes"],
+            "totalCalories": exercise["totalCalories"],
             "modalities": modalities,
             "distanceByModality": exercise["distanceByModality"],
         },

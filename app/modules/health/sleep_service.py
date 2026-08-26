@@ -30,7 +30,8 @@ def save_sleep(bedtime: str, wake_time: str, sleep_date: str | None = None) -> d
         ON CONFLICT(profile_id, sleep_date) DO UPDATE SET
             bedtime = excluded.bedtime,
             wake_time = excluded.wake_time,
-            duration_minutes = excluded.duration_minutes
+            duration_minutes = excluded.duration_minutes,
+            created_at = CURRENT_TIMESTAMP
         """,
         (profile["id"], selected_date.isoformat(), bedtime, wake_time, duration_minutes),
     )

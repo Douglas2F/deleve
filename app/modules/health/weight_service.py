@@ -24,7 +24,8 @@ def save_today_weight(weight_kg: float) -> dict:
         INSERT INTO health_weight_entries (profile_id, recorded_on, weight_kg)
         VALUES (?, ?, ?)
         ON CONFLICT(profile_id, recorded_on) DO UPDATE SET
-            weight_kg = excluded.weight_kg
+            weight_kg = excluded.weight_kg,
+            created_at = CURRENT_TIMESTAMP
         """,
         (profile["id"], date.today().isoformat(), weight),
     )

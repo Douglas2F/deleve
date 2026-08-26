@@ -22,6 +22,7 @@ def save_exercise(
     exercise_date: str | None = None,
     custom_activity: str = "",
     distance_km: float | None = None,
+    calories_burned: int | None = None,
 ) -> dict:
     """Cria ou atualiza um exercício desta semana, sem aceitar datas futuras."""
     normalized_type = str(exercise_type).strip().title()
@@ -41,6 +42,7 @@ def save_exercise(
         raise ValueError("A duração deve ficar entre 1 e 480 minutos.")
 
     distance = _parse_distance(distance_km, normalized_type)
+    calories = _parse_calories(calories_burned)
 
     normalized_note = str(note or "").strip()
     if len(normalized_note) > 300:
@@ -57,13 +59,15 @@ def save_exercise(
     database.execute(
         """
         INSERT INTO health_exercise_entries
-            (profile_id, exercise_date, exercise_type, duration_minutes, distance_km, note)
-        VALUES (?, ?, ?, ?, ?, ?)
+            (profile_id, exercise_date, exercise_type, duration_minutes, distance_km, calories_burned, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(profile_id, exercise_date) DO UPDATE SET
             exercise_type = excluded.exercise_type,
             duration_minutes = excluded.duration_minutes,
             distance_km = excluded.distance_km,
-            note = excluded.note
+            calories_burned = excluded.calories_burned,
+            note = excluded.note,
+            created_at = CURRENT_TIMESTAMP
         """,
         (
             profile["id"],
@@ -71,6 +75,7 @@ def save_exercise(
             stored_type,
             duration,
             distance,
+            calories,
             normalized_note or None,
         ),
     )
@@ -80,6 +85,7 @@ def save_exercise(
         "type": stored_type,
         "durationMinutes": duration,
         "distanceKm": distance,
+        "caloriesBurned": calories,
         "note": normalized_note,
         **_calculate_performance(stored_type, duration, distance),
     }
@@ -89,7 +95,7 @@ def get_today_exercise() -> dict | None:
     database = get_database()
     row = database.execute(
         """
-        SELECT exercise_type, duration_minutes, distance_km, note
+        SELECT exercise_type, duration_minutes, distance_km, calories_burned, note
         FROM health_exercise_entries
         WHERE profile_id = (SELECT id FROM health_profiles ORDER BY id DESC LIMIT 1)
           AND exercise_date = ?
@@ -103,6 +109,7 @@ def get_today_exercise() -> dict | None:
         "type": row["exercise_type"],
         "durationMinutes": row["duration_minutes"],
         "distanceKm": row["distance_km"],
+        "caloriesBurned": row["calories_burned"],
         "note": row["note"] or "",
         **_calculate_performance(
             row["exercise_type"], row["duration_minutes"], row["distance_km"]
@@ -117,14 +124,14 @@ def get_weekly_exercise_summary(reference_date: date | None = None) -> dict:
         "SELECT id FROM health_profiles ORDER BY id DESC LIMIT 1"
     ).fetchone()
     if profile is None:
-        return {"startDate": None, "endDate": None, "completedDays": 0, "targetDays": 0, "totalMinutes": 0, "distanceByModality": [], "days": []}
+        return {"startDate": None, "endDate": None, "completedDays": 0, "targetDays": 0, "totalMinutes": 0, "totalCalories": 0, "distanceByModality": [], "days": []}
 
     current_date = reference_date or date.today()
     start_date = current_date - timedelta(days=current_date.weekday())
     end_date = start_date + timedelta(days=6)
     rows = database.execute(
         """
-        SELECT exercise_date, exercise_type, duration_minutes, distance_km, note
+        SELECT exercise_date, exercise_type, duration_minutes, distance_km, calories_burned, note
         FROM health_exercise_entries
         WHERE profile_id = ? AND exercise_date BETWEEN ? AND ?
         ORDER BY exercise_date
@@ -152,6 +159,7 @@ def get_weekly_exercise_summary(reference_date: date | None = None) -> dict:
                 "type": row["exercise_type"] if row else None,
                 "durationMinutes": row["duration_minutes"] if row else None,
                 "distanceKm": row["distance_km"] if row else None,
+                "caloriesBurned": row["calories_burned"] if row else None,
                 "note": (row["note"] or "") if row else "",
             }
         if row:
@@ -177,6 +185,7 @@ def get_weekly_exercise_summary(reference_date: date | None = None) -> dict:
         "completedDays": len(rows),
         "targetDays": target_days,
         "totalMinutes": sum(row["duration_minutes"] for row in rows),
+        "totalCalories": sum(row["calories_burned"] or 0 for row in rows),
         "distanceByModality": [
             {
                 "type": exercise_type,
@@ -241,6 +250,18 @@ def _parse_distance(value: float | None, exercise_type: str) -> float | None:
     if not 0.1 <= distance <= 1000:
         raise ValueError("A distância deve ficar entre 0,1 e 1.000 km.")
     return round(distance, 2)
+
+
+def _parse_calories(value: int | None) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        calories = int(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError("Informe uma quantidade válida de calorias.") from error
+    if not 1 <= calories <= 10000:
+        raise ValueError("As calorias devem ficar entre 1 e 10.000 kcal.")
+    return calories
 
 
 def _calculate_performance(

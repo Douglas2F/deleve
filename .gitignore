@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest-temp/
+*.tsbuildinfo
 work/
 node_modules/
 instance/*.sqlite3

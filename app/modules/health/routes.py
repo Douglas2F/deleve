@@ -5,7 +5,7 @@ from app.modules.health.exercise_service import (
     get_weekly_exercise_summary,
     save_exercise,
 )
-from app.modules.health.services import create_profile, get_latest_profile
+from app.modules.health.services import create_profile, get_latest_profile, update_latest_profile
 from app.modules.health.sleep_service import (
     delete_sleep,
     get_today_sleep,
@@ -20,6 +20,8 @@ from app.modules.health.water_service import (
 )
 from app.modules.health.weight_service import get_weight_summary, save_today_weight
 from app.modules.health.weekly_report_service import get_weekly_health_report
+from app.modules.health.latest_activity_service import get_latest_health_activity
+from app.modules.health.daily_focus_service import delete_today_focus, get_today_focus, save_today_focus, set_today_focus_completed
 
 
 health_blueprint = Blueprint("health", __name__)
@@ -40,6 +42,14 @@ def save_health_profile():
 def read_health_profile():
     profile = get_latest_profile()
     return (jsonify(profile), 200) if profile else (jsonify({"profile": None}), 404)
+
+
+@health_blueprint.put("/api/health/profile")
+def update_health_profile():
+    try:
+        return jsonify(update_latest_profile(request.get_json(silent=True) or {}))
+    except (TypeError, ValueError) as error:
+        return jsonify({"error": str(error)}), 400
 
 
 @health_blueprint.get("/api/health/water/today")
@@ -117,6 +127,7 @@ def save_exercise_entry():
             data.get("exerciseDate"),
             data.get("customActivity", ""),
             data.get("distanceKm"),
+            data.get("caloriesBurned"),
         )
     except (TypeError, ValueError) as error:
         return jsonify({"error": str(error)}), 400
@@ -168,3 +179,34 @@ def read_weekly_health_report():
         return jsonify(get_weekly_health_report())
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
+
+
+@health_blueprint.get("/api/health/latest-activity")
+def read_latest_health_activity():
+    return jsonify({"activity": get_latest_health_activity()})
+
+
+@health_blueprint.get("/api/health/focus/today")
+def read_today_focus():
+    return jsonify({"focus": get_today_focus()})
+
+
+@health_blueprint.post("/api/health/focus/today")
+def save_focus_today():
+    try:
+        return jsonify(save_today_focus((request.get_json(silent=True) or {}).get("text", ""))), 201
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+
+@health_blueprint.patch("/api/health/focus/today")
+def complete_focus_today():
+    try:
+        return jsonify(set_today_focus_completed(bool((request.get_json(silent=True) or {}).get("completed"))))
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+
+@health_blueprint.delete("/api/health/focus/today")
+def remove_focus_today():
+    return jsonify({"deleted": delete_today_focus()})

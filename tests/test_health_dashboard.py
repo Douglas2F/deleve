@@ -15,6 +15,28 @@ def test_create_health_profile(app, client):
     assert profile_response.get_json()["name"] == "Douglas"
 
 
+def test_updates_profile_and_goals_without_replacing_profile(app, client):
+    from app.core.database import get_database, initialize_database
+
+    with app.app_context():
+        initialize_database()
+    client.post(
+        "/api/health/profile",
+        json={"name": "Douglas", "heightCm": "175", "weightKg": "78", "goals": ["Beber mais água"], "waterGoalMl": "2000"},
+    )
+
+    response = client.put(
+        "/api/health/profile",
+        json={"name": "Doug", "heightCm": "176", "goals": ["Dormir melhor", "Praticar atividade física"], "sleepGoalHours": "7", "exerciseDaysWeek": "4"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["name"] == "Doug"
+    assert response.get_json()["exerciseDaysWeek"] == 4
+    with app.app_context():
+        assert get_database().execute("SELECT COUNT(*) AS total FROM health_profiles").fetchone()["total"] == 1
+
+
 def test_registers_and_sums_today_water(app, client):
     from app.core.database import initialize_database
 
@@ -362,6 +384,88 @@ def test_registers_optional_distance_for_running(app, client):
     assert week["distanceByModality"][0]["type"] == "Corrida"
     assert week["distanceByModality"][0]["totalKm"] == 5.4
     assert week["distanceByModality"][0]["paceSecondsPerKm"] == 389
+
+
+def test_registers_optional_active_calories_for_exercise(app, client):
+    from app.core.database import initialize_database
+
+    with app.app_context():
+        initialize_database()
+    client.post(
+        "/api/health/profile",
+        json={"name": "Douglas", "heightCm": "175", "weightKg": "78", "goals": ["Praticar atividade física"]},
+    )
+
+    response = client.post(
+        "/api/health/exercise",
+        json={"type": "Corrida", "durationMinutes": 30, "distanceKm": "5", "caloriesBurned": "420"},
+    )
+    today = client.get("/api/health/exercise/today").get_json()["entry"]
+    week = client.get("/api/health/exercise/week").get_json()
+
+    assert response.status_code == 201
+    assert response.get_json()["caloriesBurned"] == 420
+    assert today["caloriesBurned"] == 420
+    assert week["totalCalories"] == 420
+
+
+def test_latest_activity_returns_a_health_record(app, client):
+    from app.core.database import initialize_database
+
+    with app.app_context():
+        initialize_database()
+    client.post(
+        "/api/health/profile",
+        json={"name": "Douglas", "heightCm": "175", "weightKg": "78", "goals": ["Praticar atividade física"]},
+    )
+    client.post("/api/health/water", json={"amountMl": 250})
+
+    activity = client.get("/api/health/latest-activity").get_json()["activity"]
+
+    assert activity["kind"] == "water"
+    assert activity["recordedAt"]
+
+
+def test_daily_focus_can_be_saved_completed_and_removed(app, client):
+    from app.core.database import initialize_database
+
+    with app.app_context():
+        initialize_database()
+    client.post(
+        "/api/health/profile",
+        json={"name": "Douglas", "heightCm": "175", "weightKg": "78", "goals": ["Bem-estar geral"]},
+    )
+
+    saved = client.post("/api/health/focus/today", json={"text": "  Ir à academia  "})
+    completed = client.patch("/api/health/focus/today", json={"completed": True})
+    current = client.get("/api/health/focus/today").get_json()["focus"]
+    removed = client.delete("/api/health/focus/today")
+
+    assert saved.status_code == 201
+    assert saved.get_json() == {"text": "Ir à academia", "completed": False}
+    assert completed.get_json()["completed"] is True
+    assert current["completed"] is True
+    assert removed.get_json()["deleted"] is True
+    assert client.get("/api/health/focus/today").get_json()["focus"] is None
+
+
+def test_rejects_invalid_active_calories(app, client):
+    from app.core.database import initialize_database
+
+    with app.app_context():
+        initialize_database()
+    client.post(
+        "/api/health/profile",
+        json={"name": "Douglas", "heightCm": "175", "weightKg": "78", "goals": ["Praticar atividade física"]},
+    )
+
+    response = client.post(
+        "/api/health/exercise",
+        json={"type": "Corrida", "durationMinutes": 30, "caloriesBurned": 0},
+    )
+
+    assert response.status_code == 400
+    assert "calorias" in response.get_json()["error"].lower()
 
 
 def test_weekly_distance_is_summed_separately_by_modality(app, client):

@@ -40,6 +40,19 @@ def _apply_migrations(database: sqlite3.Connection) -> None:
         database.execute(
             "ALTER TABLE health_exercise_entries ADD COLUMN distance_km REAL"
         )
+    if "calories_burned" not in exercise_columns:
+        database.execute(
+            "ALTER TABLE health_exercise_entries ADD COLUMN calories_burned INTEGER"
+        )
+    water_columns = {
+        row["name"]
+        for row in database.execute("PRAGMA table_info(health_water_entries)").fetchall()
+    }
+    if "created_at" not in water_columns:
+        database.execute("ALTER TABLE health_water_entries ADD COLUMN created_at TEXT")
+        database.execute(
+            "UPDATE health_water_entries SET created_at = recorded_at WHERE created_at IS NULL"
+        )
 
 
 @click.command("init-db")

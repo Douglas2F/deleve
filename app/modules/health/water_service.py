@@ -27,8 +27,8 @@ def add_water_entry(amount_ml: int = DEFAULT_GLASS_ML, water_date: str | None = 
 
     database.execute(
         """
-        INSERT INTO health_water_entries (profile_id, amount_ml, recorded_at)
-        VALUES (?, ?, ?)
+        INSERT INTO health_water_entries (profile_id, amount_ml, recorded_at, created_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
         """,
         (profile["id"], amount, f"{selected_date.isoformat()} 12:00:00"),
     )
