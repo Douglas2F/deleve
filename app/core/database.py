@@ -26,6 +26,20 @@ def initialize_database() -> None:
     schema_path = Path(__file__).with_name("schema.sql")
     database = get_database()
     database.executescript(schema_path.read_text(encoding="utf-8"))
+    _apply_migrations(database)
+    database.commit()
+
+
+def _apply_migrations(database: sqlite3.Connection) -> None:
+    """Atualiza bancos já existentes sem apagar os registros do usuário."""
+    exercise_columns = {
+        row["name"]
+        for row in database.execute("PRAGMA table_info(health_exercise_entries)").fetchall()
+    }
+    if "distance_km" not in exercise_columns:
+        database.execute(
+            "ALTER TABLE health_exercise_entries ADD COLUMN distance_km REAL"
+        )
 
 
 @click.command("init-db")
@@ -38,4 +52,3 @@ def initialize_database_command() -> None:
 def init_app(app: Flask) -> None:
     app.teardown_appcontext(close_database)
     app.cli.add_command(initialize_database_command)
-

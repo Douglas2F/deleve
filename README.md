@@ -2,48 +2,69 @@
 
 **Sua rotina, do seu jeito.**
 
-Aplicação web modular e mobile first para acompanhar hábitos com o mínimo de esforço. O primeiro módulo em desenvolvimento é **Saúde**.
+Aplicação web modular e mobile-first para acompanhar hábitos com poucos toques. O primeiro módulo em desenvolvimento é **Saúde**.
 
-## Estado atual
+## Funcionalidades atuais
 
-Esta primeira etapa contém:
+- configuração inicial personalizada;
+- dashboard diário de saúde;
+- registros de água com histórico semanal e lançamento retroativo;
+- registros de sono com duração, meta e calendário semanal;
+- exercícios com modalidade, duração, distância opcional, pace de corrida e velocidade média de ciclismo;
+- histórico de peso e evolução desde o primeiro registro;
+- relatório semanal consolidado;
+- edição e exclusão de registros;
+- validações no frontend e no backend.
 
-- estrutura modular da aplicação;
-- página inicial responsiva do módulo Saúde;
-- configuração do SQLite;
-- tabela inicial do perfil de saúde;
-- testes da página e do banco de dados.
+## Tecnologias
 
-## Preparar o projeto no Windows
+- **Frontend:** React, TypeScript, Vite e Tailwind CSS;
+- **Backend:** Python e Flask;
+- **Banco de dados:** SQLite;
+- **Testes:** Pytest e TypeScript.
+
+## Preparar o backend no Windows
 
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements-dev.txt
+python -m flask --app run init-db
+python -m flask --app run run
 ```
 
-Se o comando `py` não estiver disponível, use o caminho da sua instalação do Python.
+O backend ficará disponível em `http://127.0.0.1:5000`.
 
-## Criar o banco de dados
+## Preparar o frontend
+
+Em outro terminal:
 
 ```powershell
-flask --app run init-db
+cd frontend
+npm install
+npm run dev
 ```
 
-## Executar
+O aplicativo ficará disponível em `http://localhost:5173`.
+
+## Executar os testes
+
+Na raiz do projeto:
 
 ```powershell
-flask --app run run --debug
+python -m pytest
 ```
 
-Abra `http://127.0.0.1:5000` no navegador.
-
-## Testar
+No diretório `frontend`:
 
 ```powershell
-pytest
+npm run build
 ```
 
-## Próxima etapa
+## Dados locais
 
-Implementar a configuração inicial do perfil de saúde com apenas os dados realmente necessários.
+O banco SQLite, o ambiente virtual, dependências instaladas e arquivos de build são ignorados pelo Git. Assim, os registros pessoais permanecem apenas no computador do usuário.
+
+## Estado do projeto
+
+Versão inicial funcional do módulo Saúde. Os próximos módulos previstos são Estudos, Leitura e Rotina.
