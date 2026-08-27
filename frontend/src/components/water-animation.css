@@ -1,0 +1,52 @@
+.water-card{position:relative;isolation:isolate}
+.water-card-content{position:relative}
+.water-card-content>div:first-child,.water-card-content>p:first-of-type,.water-card-content button,.water-card-content>p[role=alert]{position:relative;z-index:4}
+.water-animation{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none}
+.water-level{position:absolute;inset:24px 0 0;transition:transform 1.2s cubic-bezier(.22,.7,.25,1),opacity .3s}
+.water-animation[data-empty=true] .water-level{opacity:0}
+.water-layer{position:absolute;inset:0;background:currentColor}
+.water-layer-back{color:rgb(8 76 135 / .17)}
+.water-layer-front{top:6px;color:rgb(155 239 255 / .13)}
+.water-wave{display:block;max-width:none;position:absolute;bottom:calc(100% - 1px);left:0;width:200%;height:32px;fill:currentColor;animation:water-drift 12s linear infinite}
+.water-layer-front .water-wave{height:24px;animation-duration:9s;animation-direction:reverse}
+.water-animation[data-paused=true] .water-wave,.water-animation[data-empty=true] .water-wave{animation-play-state:paused}
+.water-animation[data-paused=true] .water-level{transition:none}
+.water-motion-control{position:relative}
+.water-motion-indicator{position:absolute;right:-3px;bottom:-3px;display:grid;width:17px;height:17px;place-items:center;border-radius:50%;background:#0369a1;color:white;opacity:0;transform:scale(.8);pointer-events:none;transition:opacity .15s,transform .15s}
+.water-motion-control:is(:focus,:active) .water-motion-indicator{opacity:1;transform:scale(1)}
+@media(hover:hover){.water-motion-control:hover .water-motion-indicator{opacity:1;transform:scale(1)}}
+.water-static-icon{display:none}
+@keyframes water-drift{to{transform:translateX(-50%)}}
+.water-card-readings{transition:opacity .28s ease}
+.water-card[data-celebrating=true] .water-card-readings{opacity:0}
+.water-goal-burst{position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:2;animation:water-goal-fade 4.4s ease both}
+.water-goal-fill{position:absolute;inset:0;color:#0284c7;transform:translateY(calc(100% + 60px));animation:water-goal-flood 1.7s cubic-bezier(.3,.55,.25,1) both}
+.water-goal-surface{display:block;position:absolute;top:-60px;left:-1px;width:calc(200% + 4px);max-width:none;height:calc(100% + 62px);margin:0;fill:currentColor;animation:water-goal-drift 4.4s linear both}
+.water-goal-drop{position:absolute;top:78%;width:7px;height:10px;border-radius:60% 40% 65% 35%;background:#ddfbff;opacity:0;animation:water-goal-particle 2.4s ease-out both}
+.water-goal-drop:nth-child(2n){width:5px;height:7px;top:70%}
+.water-goal-announcement{position:absolute;inset:76px 16px 44px;z-index:3;display:grid;place-items:center;pointer-events:none}
+.water-goal-message{display:flex;flex-direction:column;align-items:center;gap:16px;max-width:100%;color:white;text-align:center;animation:water-goal-message 4.4s ease both}
+.water-goal-message strong{font-size:29px;font-weight:650;line-height:1.2;letter-spacing:-.04em;opacity:0;animation:water-goal-label .45s 1.45s ease both}
+.water-goal-symbol{position:relative;display:grid;place-items:center;width:90px;height:90px}
+.water-goal-morph{width:76px;height:76px;position:relative;z-index:1}
+.water-goal-leaf{opacity:0;transform-origin:32px 24px;animation:water-goal-label .45s 1.45s ease both}
+.water-goal-ripple{position:absolute;inset:0;border:1.5px solid #c9faff;border-radius:50%;opacity:0;animation:water-goal-ripple 1.5s 1.4s cubic-bezier(.15,.65,.25,1) both}
+.water-goal-announcement[data-paused=true] :is(.water-goal-message,.water-goal-message strong,.water-goal-leaf){animation:none;opacity:1}
+.water-goal-announcement[data-paused=true] .water-goal-ripple{animation:none;opacity:0}
+@keyframes water-goal-flood{from{transform:translateY(calc(100% + 60px))}to{transform:translateY(0)}}
+@keyframes water-goal-drift{to{transform:translateX(-50%)}}
+@keyframes water-goal-fade{0%,82%{opacity:1}100%{opacity:0}}
+@keyframes water-goal-particle{0%{opacity:0;transform:translateY(8px) scale(.5)}20%,55%{opacity:.8}100%{opacity:0;transform:translateY(-150px) scale(.4)}}
+@keyframes water-goal-message{0%{opacity:0;transform:translateY(6px)}12%,85%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-4px)}}
+@keyframes water-goal-label{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+@keyframes water-goal-ripple{0%{opacity:.7;transform:scale(.65)}100%{opacity:0;transform:scale(2.5)}}
+@media(prefers-reduced-motion:reduce){
+ .water-wave{animation:none!important}
+ .water-level{transition:none!important}
+ .water-card-readings{transition:none!important}
+ .water-motion-control{display:none}
+ .water-static-icon{display:grid}
+ .water-goal-burst{display:none}
+ .water-goal-message,.water-goal-message strong,.water-goal-leaf{animation:none!important;opacity:1}
+ .water-goal-ripple{animation:none!important;opacity:0}
+}

@@ -1,4 +1,5 @@
-import { Activity, ArrowRight, BookOpen, Check, Droplets, GraduationCap, HeartPulse, Home, MoonStar, Sparkles } from "lucide-react";
+import DeleveSymbol from "./DeleveSymbol";
+import { Activity, ArrowRight, BookOpen, Check, Droplets, GraduationCap, HeartPulse, Home, MoonStar } from "lucide-react";
 import Brand from "./Brand";
 
 type LandingPageProps = { onStart: () => void };
@@ -28,7 +29,7 @@ export default function LandingPage({ onStart }: LandingPageProps) {
           </section>
 
           <div className="mt-auto rounded-2xl bg-stone-950 p-4 text-white">
-            <Sparkles size={19} className="text-emerald-400" />
+            <DeleveSymbol size={19} className="text-emerald-400" />
             <p className="mt-3 text-sm font-semibold">Comece do seu jeito.</p>
             <p className="mt-1 text-xs leading-5 text-stone-400">Ative somente o que deseja acompanhar agora.</p>
           </div>

@@ -2,8 +2,12 @@ from flask import Blueprint, jsonify, render_template, request
 from app.modules.health.exercise_service import (
     delete_exercise,
     get_today_exercise,
+    get_today_exercises,
+    delete_exercise_by_id,
+    summarize_exercises,
     get_weekly_exercise_summary,
     save_exercise,
+    preview_exercise_calories,
 )
 from app.modules.health.services import create_profile, get_latest_profile, update_latest_profile
 from app.modules.health.sleep_service import (
@@ -113,11 +117,21 @@ def remove_sleep_entry(sleep_date: str):
 
 @health_blueprint.get("/api/health/exercise/today")
 def read_today_exercise():
-    return jsonify({"entry": get_today_exercise()})
+    entries = get_today_exercises()
+    return jsonify({"entry": entries[0] if entries else None, "entries": entries, **summarize_exercises(entries)})
+
+
+@health_blueprint.post("/api/health/exercise/calorie-estimate")
+def preview_calories():
+    try:
+        return jsonify(preview_exercise_calories(request.get_json(silent=True) or {}))
+    except (TypeError, ValueError, OverflowError) as error:
+        return jsonify({"error": str(error)}), 400
 
 
 @health_blueprint.post("/api/health/exercise")
-def save_exercise_entry():
+@health_blueprint.put("/api/health/exercise/<int:entry_id>")
+def save_exercise_entry(entry_id=None):
     data = request.get_json(silent=True) or {}
     try:
         result = save_exercise(
@@ -128,10 +142,30 @@ def save_exercise_entry():
             data.get("customActivity", ""),
             data.get("distanceKm"),
             data.get("caloriesBurned"),
+            entry_id=entry_id,
+            calorie_source=data.get("calorieSource"),
+            effort=data.get("effort"),
+            duration_seconds=data.get("durationSeconds"),
         )
+    except LookupError as error:
+        return jsonify({"error": str(error)}), 404
     except (TypeError, ValueError) as error:
         return jsonify({"error": str(error)}), 400
-    return jsonify(result), 201
+    return jsonify(result), 200 if entry_id is not None else 201
+
+
+@health_blueprint.delete("/api/health/exercise/<int:entry_id>")
+def remove_exercise_by_id(entry_id: int):
+    try:
+        deleted = delete_exercise_by_id(entry_id)
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    if not deleted:
+        return jsonify({"error": "Atividade não encontrada."}), 404
+    entries = get_today_exercises()
+    return jsonify({"deleted": True, "week": get_weekly_exercise_summary(),
+                    "today": {"entry": entries[0] if entries else None, "entries": entries,
+                              **summarize_exercises(entries)}})
 
 
 @health_blueprint.get("/api/health/exercise/week")

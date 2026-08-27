@@ -54,8 +54,7 @@ CREATE TABLE IF NOT EXISTS health_exercise_entries (
  calories_burned INTEGER CHECK (calories_burned IS NULL OR calories_burned > 0),
  note TEXT,
  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
- FOREIGN KEY (profile_id) REFERENCES health_profiles (id),
- UNIQUE (profile_id, exercise_date)
+ FOREIGN KEY (profile_id) REFERENCES health_profiles (id)
 );
 
 CREATE TABLE IF NOT EXISTS health_weight_entries (

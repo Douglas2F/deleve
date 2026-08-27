@@ -43,12 +43,26 @@ def get_weekly_health_report(reference_date: date | None = None) -> dict:
     ).fetchall()
     sleep_goal_minutes = int(float(profile["sleep_goal_hours"] or 0) * 60)
     sleep_total = sum(row["duration_minutes"] for row in sleep_rows)
+    water_by_date = {row["entry_date"]: row["total_ml"] for row in water_rows}
+    sleep_by_date = {row["sleep_date"]: row["duration_minutes"] for row in sleep_rows}
+
+    def daily_values(values: dict, goal: int) -> list[dict]:
+        days = []
+        for offset in range(7):
+            day = week_start + timedelta(days=offset)
+            value = values.get(day.isoformat())
+            days.append({
+                "date": day.isoformat(),
+                "value": value,
+                "isFuture": day > today,
+                "goalReached": bool(goal and value is not None and value >= goal),
+            })
+        return days
 
     exercise = get_weekly_exercise_summary(today)
     modalities = []
-    for day in exercise["days"]:
-        if day["hasExercise"] and day["type"] not in modalities:
-            modalities.append(day["type"])
+    for item in exercise["byModality"]:
+        modalities.append(item["type"])
 
     weight_rows = database.execute(
         """
@@ -71,6 +85,7 @@ def get_weekly_health_report(reference_date: date | None = None) -> dict:
     return {
         "startDate": week_start.isoformat(),
         "endDate": week_end.isoformat(),
+        "referenceDate": today.isoformat(),
         "elapsedDays": elapsed_days,
         "recordedAreas": recorded_areas,
         "summary": _build_summary(recorded_areas),
@@ -79,18 +94,27 @@ def get_weekly_health_report(reference_date: date | None = None) -> dict:
             "averageMl": round(water_total / elapsed_days),
             "goalMl": water_goal,
             "goalDays": sum(row["total_ml"] >= water_goal for row in water_rows) if water_goal else 0,
+            "recordedDays": len(water_rows),
+            "days": daily_values(water_by_date, water_goal),
         },
         "sleep": {
             "averageMinutes": round(sleep_total / len(sleep_rows)) if sleep_rows else 0,
             "recordedDays": len(sleep_rows),
             "goalMinutes": sleep_goal_minutes,
             "goalDays": sum(row["duration_minutes"] >= sleep_goal_minutes for row in sleep_rows) if sleep_goal_minutes else 0,
+            "days": daily_values(sleep_by_date, sleep_goal_minutes),
         },
         "exercise": {
             "completedDays": exercise["completedDays"],
+            "activityCount": exercise["activityCount"],
+            "byModality": exercise["byModality"],
             "targetDays": exercise["targetDays"],
             "totalMinutes": exercise["totalMinutes"],
+            "totalSeconds": exercise["totalSeconds"],
             "totalCalories": exercise["totalCalories"],
+            "calorieSource": exercise["calorieSource"],
+            "estimatedCalories": exercise["estimatedCalories"],
+            "manualCalories": exercise["manualCalories"],
             "modalities": modalities,
             "distanceByModality": exercise["distanceByModality"],
         },
@@ -98,6 +122,10 @@ def get_weekly_health_report(reference_date: date | None = None) -> dict:
             "currentWeightKg": current_weight,
             "weeklyChangeKg": weekly_weight_change,
             "recordedDays": len(weight_rows),
+            "comparisonAvailable": len(weight_rows) > 1,
+            "initialWeightKg": float(weight_rows[0]["weight_kg"]) if weight_rows else None,
+            "initialDate": weight_rows[0]["recorded_on"] if weight_rows else None,
+            "latestDate": weight_rows[-1]["recorded_on"] if weight_rows else None,
         },
     }
 
@@ -107,4 +135,4 @@ def _build_summary(recorded_areas: int) -> str:
         return "Você acompanhou todas as áreas de Saúde nesta semana. Continue no seu ritmo."
     if recorded_areas >= 2:
         return "Sua semana já tem bons registros. Cada informação ajuda a enxergar sua rotina com mais clareza."
-    return "A semana está começando. Registre aos poucos, sem pressão."
+    return "Cada registro ajuda a conhecer sua rotina. Faça no seu tempo, sem pressão."

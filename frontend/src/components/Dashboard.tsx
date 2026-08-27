@@ -1,12 +1,19 @@
-import { Activity, CalendarDays, ChevronRight, Droplets, Flame, Gauge, Minus, MoonStar, Plus, Route, Scale, Sparkles, Timer } from "lucide-react";
+import DeleveSymbol from "./DeleveSymbol";
+import { exerciseSeconds, formatExerciseDuration } from "./exerciseDuration";
+import { Activity, CalendarDays, ChevronRight, Droplets, Flame, Gauge, Minus, MoonStar, Pause, Play, Plus, Route, Scale, Sun, Target, Timer, TrendingDown, TrendingUp } from "lucide-react";
+import { calorieLabel, calorieSuffix } from "./calorieLabels";
 import { useEffect, useState } from "react";
-import ExerciseDialog, { ExerciseEntry, ExerciseWeek } from "./ExerciseDialog";
+import ExerciseDialog, { ExerciseEntry, ExerciseWeek, ExerciseWeekDay } from "./ExerciseDialog";
 import SleepDialog, { SleepEntry, SleepWeek } from "./SleepDialog";
 import WeightDialog, { WeightSummary } from "./WeightDialog";
 import WeeklyReport from "./WeeklyReport";
 import WaterWeekDialog, { WaterWeek } from "./WaterWeekDialog";
 import ProfileDialog from "./ProfileDialog";
 import FocusOfDay from "./FocusOfDay";
+import WaterAnimation from "./WaterAnimation";
+import WaterGoalCelebration from "./WaterGoalCelebration";
+import { WATER_GOAL_CELEBRATION_MS } from "./waterGoalMorph";
+import { crossedWaterGoal } from "./waterGoal";
 
 export type HealthProfile={name:string;heightCm:string;weightKg:string;goal:string;goals:string[];sleepGoalHours:string;waterGoalMl:string;exerciseDaysWeek:string;targetWeightKg:string};
 
@@ -19,12 +26,15 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
  const [waterTotal,setWaterTotal]=useState(0);
  const [waterError,setWaterError]=useState("");
  const [savingWater,setSavingWater]=useState(false);
+ const [waterMotionPaused,setWaterMotionPaused]=useState(false);
+ const [waterCelebrating,setWaterCelebrating]=useState(false);
  const [sleepEntry,setSleepEntry]=useState<SleepEntry|null>(null);
  const [sleepDialogOpen,setSleepDialogOpen]=useState(false);
  const [sleepWeek,setSleepWeek]=useState<SleepWeek|null>(null);
  const [exerciseEntry,setExerciseEntry]=useState<ExerciseEntry|null>(null);
  const [exerciseDialogOpen,setExerciseDialogOpen]=useState(false);
  const [exerciseWeek,setExerciseWeek]=useState<ExerciseWeek|null>(null);
+ const exerciseDay=exerciseWeek?.days.find(day=>day.isToday);
  const [weightSummary,setWeightSummary]=useState<WeightSummary|null>(null);
  const [weightDialogOpen,setWeightDialogOpen]=useState(false);
  const [weeklyReportOpen,setWeeklyReportOpen]=useState(false);
@@ -36,6 +46,31 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
  const waterProgress=Math.min(100,Math.round((waterTotal/waterGoal)*100));
  const completedRecords=(waterTotal>0?1:0)+(sleepEntry?1:0)+(exerciseEntry?1:0);
  function markLatest(kind:LatestKind){setLatestKind(kind);setLatestAt(new Date().toISOString());localStorage.setItem("deleve-latest-health",kind)}
+
+ useEffect(()=>{
+  if(!waterCelebrating)return;
+  const timer=window.setTimeout(()=>setWaterCelebrating(false),WATER_GOAL_CELEBRATION_MS);
+  return ()=>window.clearTimeout(timer);
+ },[waterCelebrating]);
+
+ // Only saved user actions celebrate; loading the page or changing goals does not.
+ function updateRecordedWater(total:number){
+  if(crossedWaterGoal(waterTotal,total,waterGoal))setWaterCelebrating(true);
+  else if(total<waterGoal)setWaterCelebrating(false);
+  setWaterTotal(total);
+ }
+
+ function updateExerciseWeek(week:ExerciseWeek){
+  setExerciseWeek(week);
+  const entries=week.days.find(day=>day.isToday)?.entries??[];
+  const latest=[...entries].sort((a,b)=>b.recordedAt.localeCompare(a.recordedAt)||b.id-a.id)[0]??null;
+  setExerciseEntry(latest);
+  fetch("/api/health/latest-activity").then(response=>response.ok?response.json():Promise.reject())
+   .then((body:{activity:{kind:LatestKind;recordedAt:string}|null})=>{
+    if(body.activity){setLatestKind(body.activity.kind);setLatestAt(body.activity.recordedAt);localStorage.setItem("deleve-latest-health",body.activity.kind)}
+    else{setLatestKind("water");setLatestAt("");localStorage.setItem("deleve-latest-health","water")}
+   }).catch(()=>undefined);
+ }
 
  useEffect(()=>{
   fetch("/api/health/latest-activity")
@@ -102,7 +137,7 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
    const response=await fetch("/api/health/water",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amountMl:250})});
    const body=await response.json().catch(()=>({})) as WaterResponse;
    if(!response.ok)throw new Error(body.error??"Não foi possível registrar a água.");
-   setWaterTotal(body.totalMl);
+   updateRecordedWater(body.totalMl);
    markLatest("water");
    refreshWaterWeek();
   }catch(caught){
@@ -117,7 +152,7 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
    const response=await fetch("/api/health/water/latest",{method:"DELETE"});
    const body=await response.json().catch(()=>({})) as WaterResponse;
    if(!response.ok)throw new Error(body.error??"Não foi possível desfazer o último registro.");
-   setWaterTotal(body.totalMl);
+   updateRecordedWater(body.totalMl);
    refreshWaterWeek();
   }catch(caught){
    setWaterError(caught instanceof Error?caught.message:"Não foi possível desfazer o último registro.");
@@ -128,43 +163,132 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
   <header className="flex items-center justify-between"><div><p className="text-sm text-stone-500">Olá, {firstName}</p><h1 className="text-2xl font-semibold tracking-tight">Seu dia, de leve.</h1></div><button onClick={()=>setProfileOpen(true)} aria-label="Abrir perfil e metas" className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-700 to-cyan-500 font-bold text-white shadow-lg shadow-emerald-900/10 outline-none transition hover:scale-105 focus-visible:ring-4 focus-visible:ring-emerald-200">{firstName.charAt(0).toUpperCase()}</button></header>
   <div className="mt-8 flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-emerald-700">Saúde — Hoje</p><h2 className="mt-1 text-3xl font-semibold tracking-[-.04em]">Um passo de cada vez.</h2></div><span className="hidden text-sm text-stone-400 md:block">{profile.goal}</span></div>
   <FocusOfDay/>
-  <LatestRecord kind={latestKind} recordedAt={latestAt} waterTotal={waterTotal} sleepEntry={sleepEntry} exerciseEntry={exerciseEntry} weight={weightSummary?.currentWeightKg??Number(profile.weightKg)} onOpen={()=>latestKind==="water"?setWaterWeekOpen(true):latestKind==="sleep"?setSleepDialogOpen(true):latestKind==="exercise"?setExerciseDialogOpen(true):setWeightDialogOpen(true)}/>
+  <LatestRecord kind={latestKind} recordedAt={latestAt} waterTotal={waterTotal} waterGoal={waterGoal} waterWeek={waterWeek} weightSummary={weightSummary} sleepEntry={sleepEntry} exerciseEntry={exerciseEntry} exerciseCount={exerciseDay?.activityCount??(exerciseEntry?1:0)} weight={weightSummary?.currentWeightKg??Number(profile.weightKg)} onOpen={()=>latestKind==="water"?setWaterWeekOpen(true):latestKind==="sleep"?setSleepDialogOpen(true):latestKind==="exercise"?setExerciseDialogOpen(true):setWeightDialogOpen(true)}/>
   <section className="mt-6 grid gap-4 md:grid-cols-2">
-   <article className="rounded-3xl bg-gradient-to-br from-sky-600 to-cyan-500 p-6 text-white shadow-xl shadow-sky-900/10">
-    <div className="flex justify-between"><span className="grid size-11 place-items-center rounded-2xl bg-white/20"><Droplets/></span><div className="flex gap-2"><button aria-label="Desfazer último registro de água" disabled={savingWater||waterTotal<=0} onClick={removeLastGlass} className="grid size-10 place-items-center rounded-full bg-white/20 text-white transition hover:bg-white/30 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-40"><Minus/></button><button aria-label="Adicionar um copo de água" disabled={savingWater} onClick={addGlass} className="grid size-10 place-items-center rounded-full bg-white text-sky-700 transition hover:scale-105 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-60"><Plus/></button></div></div>
-    <p className="mt-8 text-sm text-sky-100">Água</p><p className="mt-1 text-3xl font-semibold">{waterTotal.toLocaleString("pt-BR")} ml <span className="text-base font-medium text-sky-100">/ {waterGoal.toLocaleString("pt-BR")} ml</span></p>
+   <article aria-label="Água de hoje" data-celebrating={waterCelebrating} className="water-card rounded-3xl bg-gradient-to-br from-sky-600 to-cyan-500 p-6 text-white shadow-xl shadow-sky-900/10">
+    <WaterAnimation progress={waterProgress} paused={waterMotionPaused} celebrating={waterCelebrating}/>
+    <div className="water-goal-announcement" role="status" aria-live="polite" aria-atomic="true" data-paused={waterMotionPaused}>
+     {waterCelebrating&&<WaterGoalCelebration paused={waterMotionPaused}/>}
+    </div>
+    <div className="water-card-content">
+    <div className="flex justify-between"><button type="button" aria-label={waterMotionPaused?"Retomar animação da água":"Pausar animação da água"} title={waterMotionPaused?"Retomar animação":"Pausar animação"} onClick={()=>setWaterMotionPaused(value=>!value)} className="water-motion-control grid size-11 place-items-center rounded-2xl bg-white/20 outline-none hover:bg-white/30 focus-visible:ring-2 focus-visible:ring-white"><Droplets aria-hidden="true"/><span className="water-motion-indicator">{waterMotionPaused?<Play size={10} aria-hidden="true"/>:<Pause size={10} aria-hidden="true"/>}</span></button><span aria-hidden="true" className="water-static-icon size-11 place-items-center rounded-2xl bg-white/20"><Droplets/></span><div className="flex gap-2"><button aria-label="Desfazer último registro de água" disabled={savingWater||waterTotal<=0} onClick={removeLastGlass} className="grid size-10 place-items-center rounded-full bg-white/20 text-white transition hover:bg-white/30 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-40"><Minus/></button><button aria-label="Adicionar um copo de água" disabled={savingWater} onClick={addGlass} className="grid size-10 place-items-center rounded-full bg-white text-sky-700 transition hover:scale-105 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-60"><Plus/></button></div></div>
+    <p className="mt-2 text-right text-[10px] font-medium text-white/80">250 ml por toque</p>
+    <div className="water-card-readings"><p className="mt-3 text-sm text-sky-100">Água</p><p className="mt-1 text-3xl font-semibold">{formatMilliliters(waterTotal)}</p>
     <div className="mt-4 h-2 rounded-full bg-white/20"><div className="h-full rounded-full bg-white transition-[width] duration-300" style={{width:`${waterProgress}%`}}/></div>
-    <p className="mt-3 text-xs font-medium text-sky-100">Semana · média {formatLiters(waterWeek?.averageMl??0)}/dia</p><div className="mt-3 flex items-center justify-between gap-3"><button disabled={savingWater} onClick={addGlass} className="flex min-h-11 items-center gap-1 rounded-xl px-2 text-sm font-semibold outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white disabled:opacity-60">{savingWater?"Registrando...":"+ 1 copo"}<ChevronRight size={16}/></button><button onClick={()=>setWaterWeekOpen(true)} className="min-h-11 rounded-xl px-3 text-xs font-bold text-white outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white">Ver semana</button></div>
+    <WaterMetrics total={waterTotal} goal={waterGoal} week={waterWeek} colored/></div><div className="mt-3 flex items-center justify-end"><button onClick={()=>setWaterWeekOpen(true)} className="min-h-11 rounded-xl px-3 text-xs font-bold text-white outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white">Ver semana</button></div>
     {waterError&&<p role="alert" className="mt-3 rounded-xl bg-white/15 p-3 text-sm">{waterError}</p>}
+    </div>
    </article>
-   <div className="grid grid-cols-2 gap-4">
-    <Mini icon={<MoonStar/>} title="Sono" value={sleepEntry?formatDuration(sleepEntry.durationMinutes):`Meta ${profile.sleepGoalHours}h`} detail={`Semana · média ${formatDuration(sleepWeek?.averageMinutes??0)}`} color="bg-indigo-100 text-indigo-700" onClick={()=>setSleepDialogOpen(true)}/>
-    <ExerciseCard entry={exerciseEntry} week={exerciseWeek} onClick={()=>setExerciseDialogOpen(true)}/>
-    <button onClick={()=>setWeightDialogOpen(true)} className="col-span-2 flex items-center justify-between rounded-3xl bg-white p-5 text-left shadow-sm ring-1 ring-stone-100 outline-none transition hover:-translate-y-1 focus-visible:ring-4 focus-visible:ring-amber-200"><div className="flex items-center gap-4"><span className="grid size-11 place-items-center rounded-2xl bg-amber-100 text-amber-700"><Scale/></span><div><p className="text-sm text-stone-500">Peso atual</p><b className="text-xl">{formatWeight(weightSummary?.currentWeightKg??Number(profile.weightKg))} kg</b>{weightSummary&&weightSummary.changeKg!==0&&<p className="mt-1 text-xs text-stone-400">{weightSummary.changeKg>0?"+":""}{formatWeight(weightSummary.changeKg)} kg desde o início</p>}</div></div><ChevronRight className="text-stone-300"/></button>
+   <div className={`grid gap-4 ${exerciseDay&&exerciseDay.activityCount>1?"grid-cols-1":"grid-cols-2"}`}>
+    <SleepCard entry={sleepEntry} week={sleepWeek} goalHours={profile.sleepGoalHours} onClick={()=>setSleepDialogOpen(true)}/>
+    <ExerciseCard entry={exerciseEntry} day={exerciseDay} week={exerciseWeek} onClick={()=>setExerciseDialogOpen(true)}/>
+    <button onClick={()=>setWeightDialogOpen(true)} className="col-span-full flex min-w-0 items-center justify-between gap-3 rounded-3xl bg-white p-5 text-left shadow-sm ring-1 ring-stone-100 outline-none transition hover:-translate-y-1 focus-visible:ring-4 focus-visible:ring-amber-200">
+     <div className="flex min-w-0 items-start gap-4"><span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700"><Scale/></span><div className="min-w-0"><p className="text-sm text-stone-500">Peso atual</p><b className="text-xl">{formatWeight(weightSummary?.currentWeightKg??Number(profile.weightKg))} kg</b><WeightMetrics summary={weightSummary}/></div></div><ChevronRight className="shrink-0 text-stone-300"/>
+    </button>
    </div>
   </section>
   <section className="mt-5 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-100"><div className="flex justify-between"><div><p className="text-sm text-stone-500">Progresso de hoje</p><h3 className="mt-1 text-xl font-semibold">{completedRecords?`${completedRecords} registro${completedRecords>1?"s":""} concluído${completedRecords>1?"s":""}`:"Comece com um registro"}</h3></div><span className="text-sm font-semibold text-emerald-700">{completedRecords} de 3</span></div><div className="mt-5 h-2 rounded-full bg-stone-100"><div className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-cyan-500 transition-[width] duration-300" style={{width:`${completedRecords?Math.round((completedRecords/3)*100):4}%`}}/></div><p className="mt-4 text-sm text-stone-500">Sem pressão. Cada pequeno registro já conta.</p><button onClick={()=>setWeeklyReportOpen(true)} className="mt-5 flex min-h-12 w-full items-center justify-between rounded-2xl bg-emerald-50 px-4 text-sm font-bold text-emerald-800 outline-none transition hover:bg-emerald-100 focus-visible:ring-4 focus-visible:ring-emerald-200"><span className="flex items-center gap-2"><CalendarDays size={18}/>Ver relatório semanal</span><ChevronRight size={18}/></button></section>
- </section><ProfileDialog open={profileOpen} profile={profile} onClose={()=>setProfileOpen(false)} onSaved={onProfileUpdated}/><SleepDialog open={sleepDialogOpen} onClose={()=>setSleepDialogOpen(false)} onSaved={entry=>{setSleepEntry(entry);markLatest("sleep")}} onDeletedToday={()=>{setSleepEntry(null);markLatest("water")}} onWeekChanged={setSleepWeek} initialEntry={sleepEntry}/><ExerciseDialog open={exerciseDialogOpen} onClose={()=>setExerciseDialogOpen(false)} onSaved={entry=>{setExerciseEntry(entry);markLatest("exercise")}} onDeletedToday={()=>{setExerciseEntry(null);markLatest("water")}} onWeekChanged={setExerciseWeek} initialEntry={exerciseEntry}/><WeightDialog open={weightDialogOpen} onClose={()=>setWeightDialogOpen(false)} onSaved={summary=>{setWeightSummary(summary);markLatest("weight")}} summary={weightSummary} fallbackWeight={profile.weightKg}/><WaterWeekDialog open={waterWeekOpen} onClose={()=>setWaterWeekOpen(false)} week={waterWeek} onWeekChanged={setWaterWeek} onTodayChanged={total=>{setWaterTotal(total);markLatest("water")}}/><WeeklyReport open={weeklyReportOpen} onClose={()=>setWeeklyReportOpen(false)}/></main>
+ </section><ProfileDialog open={profileOpen} profile={profile} onClose={()=>setProfileOpen(false)} onSaved={onProfileUpdated}/><SleepDialog open={sleepDialogOpen} onClose={()=>setSleepDialogOpen(false)} onSaved={entry=>{setSleepEntry(entry);markLatest("sleep")}} onDeletedToday={()=>{setSleepEntry(null);markLatest("water")}} onWeekChanged={setSleepWeek} initialEntry={sleepEntry}/><ExerciseDialog open={exerciseDialogOpen} onClose={()=>setExerciseDialogOpen(false)} onChanged={updateExerciseWeek}/><WeightDialog open={weightDialogOpen} onClose={()=>setWeightDialogOpen(false)} onSaved={summary=>{setWeightSummary(summary);markLatest("weight")}} summary={weightSummary} fallbackWeight={profile.weightKg}/><WaterWeekDialog open={waterWeekOpen} onClose={()=>setWaterWeekOpen(false)} week={waterWeek} onWeekChanged={setWaterWeek} onTodayChanged={total=>{updateRecordedWater(total);markLatest("water")}}/><WeeklyReport open={weeklyReportOpen} onClose={()=>setWeeklyReportOpen(false)}/></main>
 }
 
-function LatestRecord({kind,recordedAt,waterTotal,sleepEntry,exerciseEntry,weight,onOpen}:{kind:LatestKind;recordedAt:string;waterTotal:number;sleepEntry:SleepEntry|null;exerciseEntry:ExerciseEntry|null;weight:number;onOpen:()=>void}){
- const content=kind==="sleep"?{label:"Sono registrado",value:sleepEntry?formatDuration(sleepEntry.durationMinutes):"Pronto para descansar",detail:<span className="text-xs text-white/55">{sleepEntry?`${sleepEntry.bedtime} — ${sleepEntry.wakeTime}`:"Toque para registrar"}</span>,icon:<MoonStar size={25}/>,accent:"from-indigo-400 to-violet-500"}:kind==="exercise"?{label:"Movimento registrado",value:exerciseEntry?.type??"Hora de se movimentar",detail:exerciseEntry?<ExerciseMetrics entry={exerciseEntry} dark/>:<span className="text-xs text-white/55">Toque para registrar</span>,icon:<Activity size={25}/>,accent:"from-rose-400 to-orange-400"}:kind==="weight"?{label:"Peso atualizado",value:`${formatWeight(weight)} kg`,detail:<span className="text-xs text-white/55">Acompanhe sua evolução</span>,icon:<Scale size={25}/>,accent:"from-amber-300 to-orange-500"}:{label:"Hidratação atualizada",value:waterTotal?`${waterTotal.toLocaleString("pt-BR")} ml`:"Comece com um copo",detail:<span className="text-xs text-white/55">Cada copo conta</span>,icon:<Droplets size={25}/>,accent:"from-sky-400 to-cyan-400"};
- return <button onClick={onOpen} className="group relative mt-6 w-full overflow-hidden rounded-[2rem] bg-stone-950 p-5 text-left text-white shadow-2xl shadow-emerald-950/15 outline-none transition hover:-translate-y-0.5 focus-visible:ring-4 focus-visible:ring-emerald-300"><span className={`absolute -right-12 -top-16 size-44 rounded-full bg-gradient-to-br ${content.accent} opacity-70 blur-2xl transition duration-500 group-hover:scale-110`}/><span className="absolute bottom-0 left-1/3 h-px w-2/3 bg-gradient-to-r from-transparent via-white/50 to-transparent"/><div className="relative flex items-center gap-4"><span className={`grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${content.accent} shadow-lg`}>{content.icon}</span><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2 text-[.68rem] font-bold uppercase tracking-[.18em] text-white/55"><span className="flex items-center gap-1.5"><Sparkles size={13}/>Último registro</span>{recordedAt&&<span className="whitespace-nowrap normal-case tracking-normal">{formatLatestTime(recordedAt)}</span>}</span><span className="mt-1 block text-sm text-white/70">{content.label}</span><strong className="mt-0.5 block text-xl leading-tight tracking-tight">{content.value}</strong><span className="mt-2 block">{content.detail}</span></span><ChevronRight className="shrink-0 text-white/45 transition group-hover:translate-x-1"/></div></button>
+function LatestRecord({kind,recordedAt,waterTotal,waterGoal,waterWeek,sleepEntry,exerciseEntry,exerciseCount,weight,weightSummary,onOpen}:{kind:LatestKind;recordedAt:string;waterTotal:number;waterGoal:number;waterWeek:WaterWeek|null;sleepEntry:SleepEntry|null;exerciseEntry:ExerciseEntry|null;exerciseCount:number;weight:number;weightSummary:WeightSummary|null;onOpen:()=>void}){
+ const content=kind==="sleep"
+  ?{label:"Sono registrado",value:sleepEntry?formatDuration(sleepEntry.durationMinutes):"Pronto para descansar",detail:sleepEntry?<SleepMetrics entry={sleepEntry} dark/>:<span className="text-xs text-white/55">Toque para registrar</span>,icon:<MoonStar size={25}/>,accent:"from-indigo-400 to-violet-500"}
+  :kind==="exercise"
+  ?{label:"Movimento registrado",value:exerciseEntry?.type??"Hora de se movimentar",detail:exerciseEntry?<><ExerciseMetrics entry={exerciseEntry} dark/>{exerciseCount>1&&<span className="mt-3 block text-xs text-white/60">{exerciseCount} atividades hoje · Ver todas</span>}</>:<span className="text-xs text-white/55">Toque para registrar</span>,icon:<Activity size={25}/>,accent:"from-rose-400 to-rose-600"}
+  :kind==="weight"
+  ?{label:"Peso atualizado",value:`${formatWeight(weight)} kg`,detail:<WeightMetrics summary={weightSummary} dark/>,icon:<Scale size={25}/>,accent:"from-amber-300 to-orange-500"}
+  :{label:"Hidratação atualizada",value:waterTotal?formatMilliliters(waterTotal):"Comece com um copo",detail:<WaterMetrics total={waterTotal} goal={waterGoal} week={waterWeek} dark/>,icon:<Droplets size={25}/>,accent:"from-sky-400 to-cyan-400"};
+ return <button onClick={onOpen} className="group relative mt-6 w-full overflow-hidden rounded-[2rem] bg-stone-950 p-5 text-left text-white shadow-2xl shadow-emerald-950/15 outline-none transition hover:-translate-y-0.5 focus-visible:ring-4 focus-visible:ring-emerald-300">
+  <span className={`absolute -right-12 -top-16 size-44 rounded-full bg-gradient-to-br ${content.accent} opacity-70 blur-2xl transition duration-500 group-hover:scale-110`}/>
+  <span className="absolute bottom-0 left-1/3 h-px w-2/3 bg-gradient-to-r from-transparent via-white/50 to-transparent"/>
+  <span className="relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-3 sm:gap-x-4">
+   <span className={`grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${content.accent} shadow-lg sm:row-span-2 sm:size-14`}>{content.icon}</span>
+   <span className="min-w-0">
+    <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[.68rem] font-bold uppercase tracking-[.12em] text-white/55">
+     <span className="flex items-center gap-1.5"><DeleveSymbol size={13} className="shrink-0"/>Último registro</span>
+     {recordedAt&&<span className="whitespace-nowrap normal-case tracking-normal">{formatLatestTime(recordedAt)}</span>}
+    </span>
+    <span className="mt-1 block text-sm text-white/70">{content.label}</span>
+    <strong className="mt-0.5 block text-xl leading-tight tracking-tight">{content.value}</strong>
+   </span>
+   <ChevronRight className="size-4 shrink-0 text-white/45 transition group-hover:translate-x-1 sm:row-span-2 sm:size-6"/>
+   <span className="col-span-3 block min-w-0 sm:col-span-1 sm:col-start-2">{content.detail}</span>
+  </span>
+ </button>
 }
 
-function ExerciseCard({entry,week,onClick}:{entry:ExerciseEntry|null;week:ExerciseWeek|null;onClick:()=>void}){return <button onClick={onClick} className="rounded-3xl bg-white p-4 text-left shadow-sm ring-1 ring-stone-100 outline-none transition hover:-translate-y-1 focus-visible:ring-4 focus-visible:ring-rose-200"><span className="grid size-10 place-items-center rounded-2xl bg-rose-100 text-rose-700"><Activity/></span><p className="mt-5 text-sm text-stone-500">Exercício</p>{entry?<><b className="mt-1 block text-base leading-tight">{entry.type}</b><ExerciseMetrics entry={entry}/></>:<b className="mt-1 block text-sm">Fiz exercício</b>}<span className="mt-3 block text-[11px] font-medium text-stone-400">Semana · {formatDuration(week?.totalMinutes??0)}{week?.totalCalories?` · ${formatCalories(week.totalCalories)}`:""}</span></button>}
+function ExerciseCard({entry,day,week,onClick}:{entry:ExerciseEntry|null;day:ExerciseWeekDay|undefined;week:ExerciseWeek|null;onClick:()=>void}){
+ // Teste visual isolado: false restaura o cartão claro sem desfazer outras melhorias.
+ const darkPreview = false;
+ return <button onClick={onClick} className={`min-w-0 rounded-3xl p-4 text-left shadow-sm ring-1 outline-none transition hover:-translate-y-1 focus-visible:ring-4 focus-visible:ring-rose-200 ${darkPreview?"bg-black text-white ring-neutral-800 [&_strong]:text-white":"bg-white ring-stone-100"}`}>
+  <span className={`grid size-10 place-items-center rounded-2xl ${darkPreview?"bg-rose-400/15 text-rose-300":"bg-rose-100 text-rose-700"}`}><Activity/></span>
+  <p className={`mt-5 text-sm ${darkPreview?"text-neutral-300":"text-stone-500"}`}>Exercício</p>
+  {day&&day.activityCount>1?<><b className="mt-1 block text-base leading-tight">{day.activityCount} atividades</b>
+   <span className="mt-2 flex flex-wrap gap-1.5"><Metric icon={<Timer/>} label="Tempo total" value={formatExerciseDuration(exerciseSeconds(day.totalSeconds,day.totalMinutes))} className="bg-rose-50 text-rose-700"/>{day.totalCalories>0&&<Metric icon={<Flame/>} label={calorieLabel(day.calorieSource)} value={formatCalories(day.totalCalories)} className="bg-orange-50 text-orange-600"/>}</span>
+   {day.byModality.map(item=><span key={item.type} className="mt-3 block border-t border-rose-100 pt-2"><span className="block break-words text-xs font-semibold text-stone-700">{item.type}</span><span className="mt-1 flex flex-wrap gap-1.5">{item.totalKm!=null&&<Metric icon={<Route/>} label="Distância" value={formatDistance(item.totalKm)} className="bg-rose-50 text-rose-700"/>}<Metric icon={<Timer/>} label="Tempo" value={formatExerciseDuration(exerciseSeconds(item.totalSeconds,item.totalMinutes))} className="bg-rose-50 text-rose-700"/></span></span>)}
+   <span className="mt-3 block text-xs font-semibold text-rose-700">Ver atividades →</span>
+  </>:entry?<><b className="mt-1 block break-words text-base leading-tight">{entry.type}</b><ExerciseMetrics entry={entry} dark={darkPreview}/></>:<b className="mt-1 block text-sm">Fiz exercício</b>}
+  <span className={`mt-3 block text-[11px] font-medium ${darkPreview?"text-neutral-400":"text-stone-400"}`}>Semana · {formatExerciseDuration(exerciseSeconds(week?.totalSeconds,week?.totalMinutes??0))}{week?.totalCalories?` · ${formatCalories(week.totalCalories)}${calorieSuffix(week.calorieSource)}`:""}</span>
+ </button>
+}
 
-function ExerciseMetrics({entry,dark=false}:{entry:ExerciseEntry;dark?:boolean}){const base=dark?"bg-white/10 text-white/80":"bg-rose-50 text-rose-700";return <span className="mt-2 flex flex-wrap gap-1.5"><Metric icon={<Timer/>} value={formatDuration(entry.durationMinutes)} className={base}/>{entry.distanceKm&&<Metric icon={<Route/>} value={formatDistance(entry.distanceKm)} className={base}/>} {entry.paceSecondsPerKm&&<Metric icon={<Gauge/>} value={`Pace ${formatPace(entry.paceSecondsPerKm)}`} className={base}/>} {entry.averageSpeedKmh&&<Metric icon={<Gauge/>} value={`${entry.averageSpeedKmh.toLocaleString("pt-BR",{maximumFractionDigits:1})} km/h`} className={base}/>} {entry.caloriesBurned&&<Metric icon={<Flame/>} value={formatCalories(entry.caloriesBurned)} className={dark?"bg-orange-400/20 text-orange-200":"bg-orange-50 text-orange-600"}/>}</span>}
+function ExerciseMetrics({entry,dark=false}:{entry:ExerciseEntry;dark?:boolean}){
+ const base=dark?"bg-white/10 text-white/80":"bg-rose-50 text-rose-700";
+ return <span className="mt-2 flex flex-wrap gap-1.5">
+  {entry.distanceKm!=null&&<Metric icon={<Route/>} label="Distância" value={formatDistance(entry.distanceKm)} className={base}/>}
+  {entry.paceSecondsPerKm!=null&&<Metric icon={<Gauge/>} label="Ritmo" value={formatPace(entry.paceSecondsPerKm)} className={base}/>}
+  {entry.averageSpeedKmh!=null&&<Metric icon={<Gauge/>} label="Velocidade média" value={`${entry.averageSpeedKmh.toLocaleString("pt-BR",{maximumFractionDigits:1})} km/h`} className={base}/>}
+  <Metric icon={<Timer/>} label="Tempo" value={formatExerciseDuration(exerciseSeconds(entry.durationSeconds,entry.durationMinutes))} className={base}/>
+  {entry.caloriesBurned!=null&&<Metric icon={<Flame/>} label={calorieLabel(entry.calorieSource)} value={formatCalories(entry.caloriesBurned)} className={dark?"bg-orange-400/20 text-orange-200":"bg-orange-50 text-orange-600"}/>}
+ </span>
+}
 
-function Metric({icon,value,className}:{icon:React.ReactNode;value:string;className:string}){return <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold ${className}`}><span className="[&>svg]:size-3">{icon}</span>{value}</span>}
+function Metric({icon,label,value,className}:{icon:React.ReactNode;label:string;value:string;className:string}){return <span className={`inline-flex flex-col gap-1 rounded-xl px-2 py-1.5 ${className}`}><span className="flex items-center gap-1 text-[9px] font-medium"><span aria-hidden="true" className="[&>svg]:size-3">{icon}</span>{label}</span><strong className="whitespace-nowrap text-[11px] tabular-nums">{value}</strong></span>}
 
-function Mini({icon,title,value,detail,color,onClick}:{icon:React.ReactNode;title:string;value:string;detail?:string;color:string;onClick?:()=>void}){return <button disabled={!onClick} onClick={onClick} className="rounded-3xl bg-white p-4 text-left shadow-sm ring-1 ring-stone-100 transition enabled:hover:-translate-y-1 enabled:focus-visible:outline-4 enabled:focus-visible:outline-offset-2 enabled:focus-visible:outline-indigo-200 disabled:cursor-default"><span className={`grid size-10 place-items-center rounded-2xl ${color}`}>{icon}</span><p className="mt-5 text-sm text-stone-500">{title}</p><b className="mt-1 block text-sm">{value}</b>{detail&&<span className="mt-1 block text-xs font-medium text-stone-400">{detail}</span>}</button>}
+function SleepCard({entry,week,goalHours,onClick}:{entry:SleepEntry|null;week:SleepWeek|null;goalHours:string;onClick:()=>void}){
+ return <button onClick={onClick} className="min-w-0 rounded-3xl bg-white p-4 text-left shadow-sm ring-1 ring-stone-100 outline-none transition hover:-translate-y-1 focus-visible:ring-4 focus-visible:ring-indigo-200">
+  <span className="grid size-10 place-items-center rounded-2xl bg-indigo-100 text-indigo-700"><MoonStar/></span>
+  <p className="mt-5 text-sm text-stone-500">Sono</p>
+  <b className="mt-1 block text-base leading-tight">{entry?formatDuration(entry.durationMinutes):"Registrar sono"}</b>
+  {entry?<SleepMetrics entry={entry}/>:<span className="mt-2 flex flex-wrap gap-1.5"><Metric icon={<Target/>} label="Meta de sono" value={`${goalHours}h`} className="bg-indigo-50 text-indigo-700"/></span>}
+  {week&&week.completedDays>0&&<span className="mt-3 block text-[11px] font-medium text-stone-400">Semana · média {formatDuration(week.averageMinutes)}</span>}
+ </button>
+}
 
-function formatDuration(minutes:number){const hours=Math.floor(minutes/60),remaining=minutes%60;return remaining?`${hours}h ${remaining}min`:`${hours}h`}
+function SleepMetrics({entry,dark=false}:{entry:SleepEntry;dark?:boolean}){
+ const base=dark?"bg-white/10 text-white/80":"bg-indigo-50 text-indigo-700";
+ return <span className="mt-2 flex flex-wrap gap-1.5">
+  <Metric icon={<MoonStar/>} label="Deitei às" value={entry.bedtime} className={base}/>
+  <Metric icon={<Sun/>} label="Acordei às" value={entry.wakeTime} className={base}/>
+ </span>
+}
+
+function WaterMetrics({total,goal,week,dark=false,colored=false}:{total:number;goal:number;week:WaterWeek|null;dark?:boolean;colored?:boolean}){
+ const base=dark?"bg-white/10 text-white/80":colored?"bg-sky-950/20 text-white":"bg-sky-50 text-sky-700";
+ const remaining=Math.max(0,goal-total);
+ return <span className="mt-2 flex flex-wrap gap-1.5">
+  <Metric icon={<Target/>} label="Meta diária" value={formatMilliliters(goal)} className={base}/>
+  <Metric icon={<Droplets/>} label={remaining>0?"Faltam hoje":"Meta atingida"} value={remaining>0?formatMilliliters(remaining):"100%"} className={base}/>
+  {week&&<Metric icon={<CalendarDays/>} label="Média semanal" value={`${formatLiters(week.averageMl)}/dia`} className={base}/>}
+ </span>
+}
+
+function WeightMetrics({summary,dark=false}:{summary:WeightSummary|null;dark?:boolean}){
+ if(!summary)return <span className={`mt-2 block text-xs ${dark?"text-white/55":"text-stone-400"}`}>Registre para acompanhar sua evolução</span>;
+ const base=dark?"bg-white/10 text-white/80":"bg-amber-50 text-amber-800";
+ const change=summary.changeKg;
+ return <span className="mt-2 flex flex-wrap gap-1.5">
+  <Metric icon={<Scale/>} label="Peso inicial" value={`${formatWeight(summary.initialWeightKg)} kg`} className={base}/>
+  <Metric icon={change<0?<TrendingDown/>:change>0?<TrendingUp/>:<Minus/>} label="Desde o início" value={`${change>0?"+":""}${formatWeight(change)} kg`} className={base}/>
+ </span>
+}
+
+function formatDuration(minutes:number){const hours=Math.floor(minutes/60),remaining=minutes%60;if(!hours)return `${remaining}min`;return remaining?`${hours}h ${remaining}min`:`${hours}h`}
 function formatWeight(value:number){return value.toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1})}
 function formatDistance(value:number){return `${value.toLocaleString("pt-BR",{maximumFractionDigits:2})} km`}
-function formatExercisePerformance(entry:ExerciseEntry){if(entry.paceSecondsPerKm){const minutes=Math.floor(entry.paceSecondsPerKm/60),seconds=String(entry.paceSecondsPerKm%60).padStart(2,"0");return ` · Pace médio ${minutes}:${seconds} min/km`}if(entry.averageSpeedKmh)return ` · Velocidade média ${entry.averageSpeedKmh.toLocaleString("pt-BR",{maximumFractionDigits:1})} km/h`;return ""}
-function formatPace(totalSeconds:number){const minutes=Math.floor(totalSeconds/60),seconds=String(totalSeconds%60).padStart(2,"0");return `${minutes}:${seconds} min/km`}
+function formatPace(totalSeconds:number){const minutes=Math.floor(totalSeconds/60),seconds=String(totalSeconds%60).padStart(2,"0");return `${minutes}:${seconds} /km`}
+function formatMilliliters(value:number){return `${value.toLocaleString("pt-BR")} ml`}
 function formatLiters(value:number){return `${(value/1000).toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:2})} L`}
 function formatCalories(value:number){return `${value.toLocaleString("pt-BR")}\u00a0kcal`}
 function formatLatestTime(value:string){const normalized=value.includes("T")?value:`${value.replace(" ","T")}Z`;const date=new Date(normalized);return Number.isNaN(date.getTime())?"":`Hoje, ${date.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`}
