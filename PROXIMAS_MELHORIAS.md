@@ -1,5 +1,61 @@
 # Relatório semanal
 
+## Peso — medalha e troféu aprovados — 28/08/2026
+
+- Aplicados os dois símbolos da prévia: medalha dourada com fita verde e folha em relevo para o progresso; troféu com a folha como escultura dourada sobre base verde para a meta. Componente vetorial compartilhado, com identificadores de degradê únicos por instância.
+- Ajuste de cor aprovado: a fita da medalha mantém o degradê esmeralda → teal → ciano da marca. Após testar esse degradê no troféu, sua base voltou ao verde escuro original por preferência do usuário. Dourado, formas e animações preservados.
+- Medalha: mudança de pelo menos 1 kg desde o último registro, na direção do objetivo. Mostra a diferença real e “Um passo importante.” Sem somar pequenas mudanças nem usar o acumulado inicial.
+- Troféu: ao salvar um peso que alcança/cruza a meta pela primeira vez desde o registro anterior, tem prioridade sobre a medalha, inclusive se o último passo for menor que 1 kg. Mostra “Você chegou lá!” e a diferença desse registro. Não repete enquanto a meta já estiver alcançada, nem ao recarregar ou editar apenas a meta.
+- Entrada suave com pequena rotação, aro desenhado e reflexo curto. Duração de 4 segundos, espera o formulário fechar e o cartão ficar visível. Mantém as métricas montadas e respeita movimento reduzido. Depois, o troféu fica estático no cartão dourado com “Meta alcançada”, enquanto o peso atual cumprir a meta.
+- Água, sono, exercício e histórico pessoal preservados. Validação: TypeScript, build, 32 testes, medalha de −2 kg e troféu no último −0,5 kg com dados fictícios; conferência em 390/320 pixels e persistência ao reabrir.
+
+## Peso — medalhão de conquista e diferença entre registros — 28/08/2026
+
+- Regra aprovada: só celebra uma mudança de pelo menos 1 kg na direção do objetivo, comparando o novo peso com o último valor registrado. Não usa o peso inicial nem soma pequenas mudanças. De 78 para 76 mostra “−2 kg”; depois, de 76 para 75, mostra “−1 kg”. Para ganho, mantém o sinal positivo e o mesmo critério.
+- Mensagem exibe a diferença real, inclusive decimal, sem limitar a 1 kg. Pesos são comparados em décimos inteiros para não errar no limite exato de 1 kg por arredondamento binário.
+- Dentro do cartão: folha Deleve em medalhão dourado, contorno desenhado, reflexo curto e brilho suave, com “Na direção do seu objetivo”. Duração de 4 segundos e retorno suave às métricas, sem alterar a altura do cartão. Substitui o aviso flutuante de peso.
+- Aguarda o fechamento do formulário e o cartão visível; não dispara ao recarregar, salvar o mesmo peso ou mudar na direção oposta. Mudança de objetivo ou novo registro sem conquista cancela a animação pendente. Movimento reduzido mantém o selo estático.
+- Incentivo e prêmio são independentes: a meta numérica não bloqueia mais a animação de pelo menos 1 kg. Ao alcançar ou cruzar o peso desejado na direção escolhida, o cartão ganha degradê dourado, folha Deleve e selo “Meta alcançada”. Esse visual continua após a animação e ao reabrir a página, sem repetir a celebração. É recalculado se o peso ou a meta mudar; não é um troféu histórico. Substitui a restrição anterior de não celebrar além do peso desejado.
+- Água, exercício, sono e o acumulado já mostrado no cartão de peso foram preservados. Validação: TypeScript, build, 30 testes e navegador com registros fictícios para “−2 kg”, depois “−1 kg”, ausência em −0,5 kg, e “+3 kg” em objetivo de ganho. Prêmio dourado conferido depois da animação e ao recarregar. Conferência em 390 e 320 pixels, sem alterar histórico pessoal.
+
+## Sono — conquista dentro do cartão — 28/08/2026
+
+- Refinamento aprovado apenas para sono: lua suave, pequenas estrelas e brilho lilás dentro do cartão, substituindo seu aviso flutuante. Mostra a duração real seguida de “de descanso” e “Meta de sono atingida”.
+- Ativação somente ao atingir a meta configurada em um registro salvo de hoje, considerando o valor anterior do mesmo dia. Salvar um sono que já atingia a meta ou carregar a página não repete a celebração.
+- Aguarda o fechamento das janelas e a área central do cartão ficar visível. Dura 4 segundos, mantém a altura do cartão e devolve as métricas suavemente. Movimento reduzido mantém lua, estrelas e mensagem estáticos.
+- Correção abaixo da meta, remoção do registro e alteração da meta cancelam a conquista pendente. Exercício, peso e água preservados.
+- Validação: TypeScript, build, 27 testes e conferência no navegador com registros fictícios, duração real, ausência de aviso flutuante e ausência de repetição ao recarregar.
+
+## Exercício — conquista dentro do cartão — 28/08/2026
+
+- Refinamento aprovado apenas para exercício: o aviso flutuante é substituído por uma animação no próprio cartão, com traço de movimento desenhado, brilho rosa suave e o tempo real somado no dia seguido de “por você” (ex.: “1h 30min por você”). Os 30 minutos são apenas o gatilho, não um valor fixo na mensagem. Sem confetes ou mudança permanente no layout.
+- Dura 3,8 segundos; as métricas permanecem montadas para preservar a altura do cartão e retornam com transição suave. Preferência por movimento reduzido mostra a conquista estática.
+- Mantido o marco de 30 minutos somados no dia. Aguarda o fechamento do formulário e a área central do cartão ficar visível antes de começar. Uma correção abaixo de 30 minutos ou uma exclusão cancela a celebração pendente. Não dispara ao carregar.
+- Sono, peso e água não foram redesenhados nesta etapa. Validação: TypeScript, build, 26 testes e conferência com atividades fictícias no navegador.
+
+## Incentivos de exercício, sono e peso — 28/08/2026
+
+- Selo flutuante de 4,4 segundos, com círculo que se completa, ícone e pequenas partículas. Rosa para exercício, lilás para sono e dourado com a folha Deleve para peso. Pode ser fechado e não bloqueia os registros.
+- Exercício: comemora ao cruzar 30 minutos no total do dia, somando modalidades e respeitando os segundos. Só é acionado por salvamento de hoje; carregar, excluir ou registrar mais tempo após o marco não dispara novamente.
+- Sono: comemora ao alcançar a meta configurada em um registro salvo de hoje, sem repetir ao salvar um sono que já atingia a meta. Não inventa meta quando ela não foi configurada.
+- Peso: compara o novo valor com o último conhecido e segue explicitamente “Perder peso” ou “Ganhar peso”. Não celebra valor repetido, direção oposta, manutenção ou avanço além do peso desejado. A mensagem valoriza o progresso, sem afirmar perda de gordura ou ganho muscular.
+- Não há animação no carregamento ou na edição do perfil. Preferência por movimento reduzido mantém apenas ícone e mensagem estáticos. Celebração de água preservada.
+- Validação: TypeScript, build e 26 testes; navegador com dados fictícios para soma de atividades, sono, perda/ganho de peso, fechamento e ausência de repetição ao reabrir. Selo conferido em larguras de 320 e 390 pixels, sem alterar registros pessoais.
+
+## Meu desafio de hoje — teste de linguagem — 28/08/2026
+
+- “Foco do dia” passa a se chamar “Meu desafio de hoje”, com apenas o convite “Escolha um pequeno passo.” abaixo do título e a ação “Concluir desafio”. Removida a terceira frase redundante.
+- Ao concluir: “Desafio concluído” e “Você conseguiu. Um passo de cada vez.”. Edição, remoção com confirmação e retorno a pendente continuam disponíveis, sem penalidades.
+- Mantidos visual, API e tabela existentes; não há migração nem alteração dos desafios já registrados. Pequenos ajustes de quebra de linha acomodam os novos textos no celular.
+
+## Água — destaque persistente da meta — 28/08/2026
+
+- Último registro de água: removido “Hidratação atualizada”; mantidos título, horário, quantidade e métricas.
+
+- Quando o total diário alcança a meta exata, o cartão mantém um degradê azul profundo e o selo “Meta atingida” após a comemoração.
+- Estado derivado do total e da meta: permanece ao reabrir, não repete a animação no carregamento e é removido se o total ficar abaixo da meta. Não depende do percentual arredondado.
+- Comemoração aprovada, controles e registros preservados. Validação: TypeScript, build, 20 testes de interface/lógica e conferência em 320/390 pixels com dados fictícios.
+
 ## Versão aprovada — marca e água — 27/08/2026
 
 - Logo principal: folha acolhida por uma curva de abraço. Componente `DeleveSymbol` compartilhado pela marca e pelos destaques; substitui o antigo D com check e os brilhos. Pesquisa de exclusividade da marca ainda pendente.

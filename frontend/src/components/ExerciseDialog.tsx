@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { calorieSuffix, type CalorieSource } from "./calorieLabels";
 import { Activity, Check, Plus, X } from "lucide-react";
 import ExerciseActivityCard from "./ExerciseActivityCard";
+import type { ExerciseSaveContext } from "./healthMilestones";
 
 import { displayedEffort, effortTitle, getEffortHint, getEffortOptions, type Effort } from "./exerciseEffort";
 type CalorieEstimate={calories:number;weightKg:number;met:number;description:string};
@@ -10,7 +11,7 @@ export type ExerciseEntry={effort?:Effort|null;id:number;date:string;type:string
 export type ExerciseModality={type:string;activityCount:number;totalSeconds?:number;totalMinutes:number;totalCalories:number;totalKm:number|null;paceSecondsPerKm:number|null;averageSpeedKmh:number|null};
 export type ExerciseWeekDay={date:string;isToday:boolean;hasExercise:boolean;entries:ExerciseEntry[];activityCount:number;totalSeconds?:number;totalMinutes:number;totalCalories:number;calorieSource:CalorieSource;byModality:ExerciseModality[]};
 export type ExerciseWeek={startDate:string|null;endDate:string|null;completedDays:number;targetDays:number;activityCount:number;totalSeconds?:number;totalMinutes:number;totalCalories:number;calorieSource:CalorieSource;byModality:ExerciseModality[];distanceByModality:ExerciseModality[];days:ExerciseWeekDay[]};
-type ExerciseDialogProps={open:boolean;onClose:()=>void;onChanged:(week:ExerciseWeek)=>void};
+type ExerciseDialogProps={open:boolean;onClose:()=>void;onChanged:(week:ExerciseWeek,saved?:ExerciseSaveContext)=>void};
 
 
 const exerciseTypes=["Musculação","Dança","Corrida","Ciclismo","Futebol","Outros"];
@@ -98,10 +99,10 @@ export default function ExerciseDialog({open,onClose,onChanged}:ExerciseDialogPr
   setSelectedDate(day.date);fillForm();setFormOpen(!day.hasExercise);setNotice("");
  }
 
- async function refreshWeek(){
+ async function refreshWeek(saved:ExerciseSaveContext){
   const response=await fetch("/api/health/exercise/week");
   if(!response.ok)throw new Error("A atividade foi salva, mas o resumo não carregou. Feche e abra novamente.");
-  const body=await response.json() as ExerciseWeek;setWeek(body);onChanged(body);
+  const body=await response.json() as ExerciseWeek;setWeek(body);onChanged(body,saved);
  }
 
  async function save(event:FormEvent){
@@ -118,7 +119,8 @@ export default function ExerciseDialog({open,onClose,onChanged}:ExerciseDialogPr
    // Switch to editing the saved ID before refreshing, so a retry cannot duplicate it.
    setEditingId(body.id);setFormOpen(false);
    setNotice(editingId===null?"Atividade adicionada. As anteriores foram mantidas.":"Atividade atualizada.");
-   await refreshWeek();
+   const previousDay=week?.days.find(day=>day.date===body.date);
+   await refreshWeek({date:body.date,previousSeconds:exerciseSeconds(previousDay?.totalSeconds,previousDay?.totalMinutes??0)});
   }catch(caught){setError(caught instanceof Error?caught.message:"Não foi possível registrar a atividade.")}
   finally{setSaving(false)}
  }

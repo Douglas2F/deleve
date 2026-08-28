@@ -1,8 +1,8 @@
 import DeleveSymbol from "./DeleveSymbol";
 import { exerciseSeconds, formatExerciseDuration } from "./exerciseDuration";
-import { Activity, CalendarDays, ChevronRight, Droplets, Flame, Gauge, Minus, MoonStar, Pause, Play, Plus, Route, Scale, Sun, Target, Timer, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, CalendarDays, Check, ChevronRight, Droplets, Flame, Gauge, Minus, MoonStar, Pause, Play, Plus, Route, Scale, Sun, Target, Timer, TrendingDown, TrendingUp } from "lucide-react";
 import { calorieLabel, calorieSuffix } from "./calorieLabels";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ExerciseDialog, { ExerciseEntry, ExerciseWeek, ExerciseWeekDay } from "./ExerciseDialog";
 import SleepDialog, { SleepEntry, SleepWeek } from "./SleepDialog";
 import WeightDialog, { WeightSummary } from "./WeightDialog";
@@ -13,7 +13,12 @@ import FocusOfDay from "./FocusOfDay";
 import WaterAnimation from "./WaterAnimation";
 import WaterGoalCelebration from "./WaterGoalCelebration";
 import { WATER_GOAL_CELEBRATION_MS } from "./waterGoalMorph";
-import { crossedWaterGoal } from "./waterGoal";
+import { crossedWaterGoal, isWaterGoalReached } from "./waterGoal";
+import ExerciseCelebration, { EXERCISE_CELEBRATION_MS } from "./ExerciseCelebration";
+import SleepCelebration, { SLEEP_CELEBRATION_MS } from "./SleepCelebration";
+import WeightCelebration, { WEIGHT_CELEBRATION_MS, type WeightCelebrationEvent } from "./WeightCelebration";
+import WeightAward from "./WeightAward";
+import { sleepMilestone, exerciseMilestone, weightRewardKind, weightChangeKg, isWeightGoalReached, type ExerciseSaveContext } from "./healthMilestones";
 
 export type HealthProfile={name:string;heightCm:string;weightKg:string;goal:string;goals:string[];sleepGoalHours:string;waterGoalMl:string;exerciseDaysWeek:string;targetWeightKg:string};
 
@@ -36,6 +41,9 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
  const [exerciseWeek,setExerciseWeek]=useState<ExerciseWeek|null>(null);
  const exerciseDay=exerciseWeek?.days.find(day=>day.isToday);
  const [weightSummary,setWeightSummary]=useState<WeightSummary|null>(null);
+ const weightGoals=profile.goals??profile.goal.split(",").map(goal=>goal.trim());
+ const weightTarget=profile.targetWeightKg?Number(profile.targetWeightKg):undefined;
+ const weightGoalReached=weightSummary!==null&&isWeightGoalReached(weightSummary.currentWeightKg,weightGoals,weightTarget);
  const [weightDialogOpen,setWeightDialogOpen]=useState(false);
  const [weeklyReportOpen,setWeeklyReportOpen]=useState(false);
  const [waterWeek,setWaterWeek]=useState<WaterWeek|null>(null);
@@ -43,9 +51,36 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
  const [latestKind,setLatestKind]=useState<LatestKind>(()=>(localStorage.getItem("deleve-latest-health") as LatestKind)||"water");
  const [latestAt,setLatestAt]=useState("");
  const [profileOpen,setProfileOpen]=useState(false);
+ const [weightCelebration,setWeightCelebration]=useState<WeightCelebrationEvent|null>(null);
+ const finishWeightCelebration=useCallback(()=>setWeightCelebration(null),[]);
+ const [exerciseCelebrationId,setExerciseCelebrationId]=useState<number|null>(null);
+ const finishExerciseCelebration=useCallback(()=>setExerciseCelebrationId(null),[]);
+ const [sleepCelebrationId,setSleepCelebrationId]=useState<number|null>(null);
+ const finishSleepCelebration=useCallback(()=>setSleepCelebrationId(null),[]);
  const waterProgress=Math.min(100,Math.round((waterTotal/waterGoal)*100));
+ const waterGoalReached=isWaterGoalReached(waterTotal,waterGoal);
  const completedRecords=(waterTotal>0?1:0)+(sleepEntry?1:0)+(exerciseEntry?1:0);
  function markLatest(kind:LatestKind){setLatestKind(kind);setLatestAt(new Date().toISOString());localStorage.setItem("deleve-latest-health",kind)}
+
+ function updateRecordedSleep(entry:SleepEntry){
+  const goalMinutes=Number(profile.sleepGoalHours)*60;
+  if(sleepMilestone(sleepEntry,entry,goalMinutes))setSleepCelebrationId(Date.now());
+  else if(entry.durationMinutes<goalMinutes||!(goalMinutes>0))setSleepCelebrationId(null);
+  setSleepEntry(entry);markLatest("sleep");
+ }
+
+ useEffect(()=>{setSleepCelebrationId(null)},[profile.sleepGoalHours]);
+ useEffect(()=>{if(!sleepEntry)setSleepCelebrationId(null)},[sleepEntry]);
+
+ function updateRecordedWeight(summary:WeightSummary){
+  const reward=weightSummary?weightRewardKind(weightSummary.currentWeightKg,summary.currentWeightKg,weightGoals,weightTarget):null;
+  if(weightSummary&&reward){
+   setWeightCelebration({id:Date.now(),changeKg:weightChangeKg(weightSummary.currentWeightKg,summary.currentWeightKg),kind:reward});
+  }else setWeightCelebration(null);
+  setWeightSummary(summary);markLatest("weight");
+ }
+
+ useEffect(()=>{setWeightCelebration(null)},[profile.goal,profile.targetWeightKg]);
 
  useEffect(()=>{
   if(!waterCelebrating)return;
@@ -60,7 +95,10 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
   setWaterTotal(total);
  }
 
- function updateExerciseWeek(week:ExerciseWeek){
+ function updateExerciseWeek(week:ExerciseWeek,saved?:ExerciseSaveContext){
+  const today=week.days.find(day=>day.isToday);
+  if(exerciseMilestone(today,saved))setExerciseCelebrationId(Date.now());
+  else if(!saved||exerciseSeconds(today?.totalSeconds,today?.totalMinutes??0)<1800)setExerciseCelebrationId(null);
   setExerciseWeek(week);
   const entries=week.days.find(day=>day.isToday)?.entries??[];
   const latest=[...entries].sort((a,b)=>b.recordedAt.localeCompare(a.recordedAt)||b.id-a.id)[0]??null;
@@ -165,7 +203,7 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
   <FocusOfDay/>
   <LatestRecord kind={latestKind} recordedAt={latestAt} waterTotal={waterTotal} waterGoal={waterGoal} waterWeek={waterWeek} weightSummary={weightSummary} sleepEntry={sleepEntry} exerciseEntry={exerciseEntry} exerciseCount={exerciseDay?.activityCount??(exerciseEntry?1:0)} weight={weightSummary?.currentWeightKg??Number(profile.weightKg)} onOpen={()=>latestKind==="water"?setWaterWeekOpen(true):latestKind==="sleep"?setSleepDialogOpen(true):latestKind==="exercise"?setExerciseDialogOpen(true):setWeightDialogOpen(true)}/>
   <section className="mt-6 grid gap-4 md:grid-cols-2">
-   <article aria-label="Água de hoje" data-celebrating={waterCelebrating} className="water-card rounded-3xl bg-gradient-to-br from-sky-600 to-cyan-500 p-6 text-white shadow-xl shadow-sky-900/10">
+   <article aria-label="Água de hoje" data-celebrating={waterCelebrating} data-goal-reached={waterGoalReached} className="water-card rounded-3xl bg-gradient-to-br from-sky-600 to-cyan-500 p-6 text-white shadow-xl shadow-sky-900/10">
     <WaterAnimation progress={waterProgress} paused={waterMotionPaused} celebrating={waterCelebrating}/>
     <div className="water-goal-announcement" role="status" aria-live="polite" aria-atomic="true" data-paused={waterMotionPaused}>
      {waterCelebrating&&<WaterGoalCelebration paused={waterMotionPaused}/>}
@@ -173,22 +211,20 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
     <div className="water-card-content">
     <div className="flex justify-between"><button type="button" aria-label={waterMotionPaused?"Retomar animação da água":"Pausar animação da água"} title={waterMotionPaused?"Retomar animação":"Pausar animação"} onClick={()=>setWaterMotionPaused(value=>!value)} className="water-motion-control grid size-11 place-items-center rounded-2xl bg-white/20 outline-none hover:bg-white/30 focus-visible:ring-2 focus-visible:ring-white"><Droplets aria-hidden="true"/><span className="water-motion-indicator">{waterMotionPaused?<Play size={10} aria-hidden="true"/>:<Pause size={10} aria-hidden="true"/>}</span></button><span aria-hidden="true" className="water-static-icon size-11 place-items-center rounded-2xl bg-white/20"><Droplets/></span><div className="flex gap-2"><button aria-label="Desfazer último registro de água" disabled={savingWater||waterTotal<=0} onClick={removeLastGlass} className="grid size-10 place-items-center rounded-full bg-white/20 text-white transition hover:bg-white/30 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-40"><Minus/></button><button aria-label="Adicionar um copo de água" disabled={savingWater} onClick={addGlass} className="grid size-10 place-items-center rounded-full bg-white text-sky-700 transition hover:scale-105 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-60"><Plus/></button></div></div>
     <p className="mt-2 text-right text-[10px] font-medium text-white/80">250 ml por toque</p>
-    <div className="water-card-readings"><p className="mt-3 text-sm text-sky-100">Água</p><p className="mt-1 text-3xl font-semibold">{formatMilliliters(waterTotal)}</p>
+    <div className="water-card-readings"><div className="water-card-label"><p className="text-sm text-sky-100">Água</p>{waterGoalReached&&<span className="water-goal-badge"><Check size={13} strokeWidth={2.5} aria-hidden="true"/>Meta atingida</span>}</div><p className="mt-1 text-3xl font-semibold">{formatMilliliters(waterTotal)}</p>
     <div className="mt-4 h-2 rounded-full bg-white/20"><div className="h-full rounded-full bg-white transition-[width] duration-300" style={{width:`${waterProgress}%`}}/></div>
     <WaterMetrics total={waterTotal} goal={waterGoal} week={waterWeek} colored/></div><div className="mt-3 flex items-center justify-end"><button onClick={()=>setWaterWeekOpen(true)} className="min-h-11 rounded-xl px-3 text-xs font-bold text-white outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white">Ver semana</button></div>
     {waterError&&<p role="alert" className="mt-3 rounded-xl bg-white/15 p-3 text-sm">{waterError}</p>}
     </div>
    </article>
    <div className={`grid gap-4 ${exerciseDay&&exerciseDay.activityCount>1?"grid-cols-1":"grid-cols-2"}`}>
-    <SleepCard entry={sleepEntry} week={sleepWeek} goalHours={profile.sleepGoalHours} onClick={()=>setSleepDialogOpen(true)}/>
-    <ExerciseCard entry={exerciseEntry} day={exerciseDay} week={exerciseWeek} onClick={()=>setExerciseDialogOpen(true)}/>
-    <button onClick={()=>setWeightDialogOpen(true)} className="col-span-full flex min-w-0 items-center justify-between gap-3 rounded-3xl bg-white p-5 text-left shadow-sm ring-1 ring-stone-100 outline-none transition hover:-translate-y-1 focus-visible:ring-4 focus-visible:ring-amber-200">
-     <div className="flex min-w-0 items-start gap-4"><span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700"><Scale/></span><div className="min-w-0"><p className="text-sm text-stone-500">Peso atual</p><b className="text-xl">{formatWeight(weightSummary?.currentWeightKg??Number(profile.weightKg))} kg</b><WeightMetrics summary={weightSummary}/></div></div><ChevronRight className="shrink-0 text-stone-300"/>
-    </button>
+    <SleepCard entry={sleepEntry} week={sleepWeek} goalHours={profile.sleepGoalHours} celebrationId={sleepCelebrationId} celebrationBlocked={sleepDialogOpen||exerciseDialogOpen||weightDialogOpen||profileOpen||weeklyReportOpen||waterWeekOpen} onCelebrationDone={finishSleepCelebration} onClick={()=>{finishSleepCelebration();setSleepDialogOpen(true)}}/>
+    <ExerciseCard entry={exerciseEntry} day={exerciseDay} week={exerciseWeek} celebrationId={exerciseCelebrationId} celebrationBlocked={exerciseDialogOpen||sleepDialogOpen||weightDialogOpen||profileOpen||weeklyReportOpen||waterWeekOpen} onCelebrationDone={finishExerciseCelebration} onClick={()=>{finishExerciseCelebration();setExerciseDialogOpen(true)}}/>
+    <WeightCard summary={weightSummary} fallbackWeight={Number(profile.weightKg)} goalReached={weightGoalReached} celebration={weightCelebration} celebrationBlocked={weightDialogOpen||sleepDialogOpen||exerciseDialogOpen||profileOpen||weeklyReportOpen||waterWeekOpen} onCelebrationDone={finishWeightCelebration} onClick={()=>{finishWeightCelebration();setWeightDialogOpen(true)}}/>
    </div>
   </section>
   <section className="mt-5 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-100"><div className="flex justify-between"><div><p className="text-sm text-stone-500">Progresso de hoje</p><h3 className="mt-1 text-xl font-semibold">{completedRecords?`${completedRecords} registro${completedRecords>1?"s":""} concluído${completedRecords>1?"s":""}`:"Comece com um registro"}</h3></div><span className="text-sm font-semibold text-emerald-700">{completedRecords} de 3</span></div><div className="mt-5 h-2 rounded-full bg-stone-100"><div className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-cyan-500 transition-[width] duration-300" style={{width:`${completedRecords?Math.round((completedRecords/3)*100):4}%`}}/></div><p className="mt-4 text-sm text-stone-500">Sem pressão. Cada pequeno registro já conta.</p><button onClick={()=>setWeeklyReportOpen(true)} className="mt-5 flex min-h-12 w-full items-center justify-between rounded-2xl bg-emerald-50 px-4 text-sm font-bold text-emerald-800 outline-none transition hover:bg-emerald-100 focus-visible:ring-4 focus-visible:ring-emerald-200"><span className="flex items-center gap-2"><CalendarDays size={18}/>Ver relatório semanal</span><ChevronRight size={18}/></button></section>
- </section><ProfileDialog open={profileOpen} profile={profile} onClose={()=>setProfileOpen(false)} onSaved={onProfileUpdated}/><SleepDialog open={sleepDialogOpen} onClose={()=>setSleepDialogOpen(false)} onSaved={entry=>{setSleepEntry(entry);markLatest("sleep")}} onDeletedToday={()=>{setSleepEntry(null);markLatest("water")}} onWeekChanged={setSleepWeek} initialEntry={sleepEntry}/><ExerciseDialog open={exerciseDialogOpen} onClose={()=>setExerciseDialogOpen(false)} onChanged={updateExerciseWeek}/><WeightDialog open={weightDialogOpen} onClose={()=>setWeightDialogOpen(false)} onSaved={summary=>{setWeightSummary(summary);markLatest("weight")}} summary={weightSummary} fallbackWeight={profile.weightKg}/><WaterWeekDialog open={waterWeekOpen} onClose={()=>setWaterWeekOpen(false)} week={waterWeek} onWeekChanged={setWaterWeek} onTodayChanged={total=>{updateRecordedWater(total);markLatest("water")}}/><WeeklyReport open={weeklyReportOpen} onClose={()=>setWeeklyReportOpen(false)}/></main>
+ </section><ProfileDialog open={profileOpen} profile={profile} onClose={()=>setProfileOpen(false)} onSaved={onProfileUpdated}/><SleepDialog open={sleepDialogOpen} onClose={()=>setSleepDialogOpen(false)} onSaved={updateRecordedSleep} onDeletedToday={()=>{setSleepEntry(null);markLatest("water")}} onWeekChanged={setSleepWeek} initialEntry={sleepEntry}/><ExerciseDialog open={exerciseDialogOpen} onClose={()=>setExerciseDialogOpen(false)} onChanged={updateExerciseWeek}/><WeightDialog open={weightDialogOpen} onClose={()=>setWeightDialogOpen(false)} onSaved={updateRecordedWeight} summary={weightSummary} fallbackWeight={profile.weightKg}/><WaterWeekDialog open={waterWeekOpen} onClose={()=>setWaterWeekOpen(false)} week={waterWeek} onWeekChanged={setWaterWeek} onTodayChanged={total=>{updateRecordedWater(total);markLatest("water")}}/><WeeklyReport open={weeklyReportOpen} onClose={()=>setWeeklyReportOpen(false)}/></main>
 }
 
 function LatestRecord({kind,recordedAt,waterTotal,waterGoal,waterWeek,sleepEntry,exerciseEntry,exerciseCount,weight,weightSummary,onOpen}:{kind:LatestKind;recordedAt:string;waterTotal:number;waterGoal:number;waterWeek:WaterWeek|null;sleepEntry:SleepEntry|null;exerciseEntry:ExerciseEntry|null;exerciseCount:number;weight:number;weightSummary:WeightSummary|null;onOpen:()=>void}){
@@ -198,7 +234,7 @@ function LatestRecord({kind,recordedAt,waterTotal,waterGoal,waterWeek,sleepEntry
   ?{label:"Movimento registrado",value:exerciseEntry?.type??"Hora de se movimentar",detail:exerciseEntry?<><ExerciseMetrics entry={exerciseEntry} dark/>{exerciseCount>1&&<span className="mt-3 block text-xs text-white/60">{exerciseCount} atividades hoje · Ver todas</span>}</>:<span className="text-xs text-white/55">Toque para registrar</span>,icon:<Activity size={25}/>,accent:"from-rose-400 to-rose-600"}
   :kind==="weight"
   ?{label:"Peso atualizado",value:`${formatWeight(weight)} kg`,detail:<WeightMetrics summary={weightSummary} dark/>,icon:<Scale size={25}/>,accent:"from-amber-300 to-orange-500"}
-  :{label:"Hidratação atualizada",value:waterTotal?formatMilliliters(waterTotal):"Comece com um copo",detail:<WaterMetrics total={waterTotal} goal={waterGoal} week={waterWeek} dark/>,icon:<Droplets size={25}/>,accent:"from-sky-400 to-cyan-400"};
+  :{label:null,value:waterTotal?formatMilliliters(waterTotal):"Comece com um copo",detail:<WaterMetrics total={waterTotal} goal={waterGoal} week={waterWeek} dark/>,icon:<Droplets size={25}/>,accent:"from-sky-400 to-cyan-400"};
  return <button onClick={onOpen} className="group relative mt-6 w-full overflow-hidden rounded-[2rem] bg-stone-950 p-5 text-left text-white shadow-2xl shadow-emerald-950/15 outline-none transition hover:-translate-y-0.5 focus-visible:ring-4 focus-visible:ring-emerald-300">
   <span className={`absolute -right-12 -top-16 size-44 rounded-full bg-gradient-to-br ${content.accent} opacity-70 blur-2xl transition duration-500 group-hover:scale-110`}/>
   <span className="absolute bottom-0 left-1/3 h-px w-2/3 bg-gradient-to-r from-transparent via-white/50 to-transparent"/>
@@ -209,7 +245,7 @@ function LatestRecord({kind,recordedAt,waterTotal,waterGoal,waterWeek,sleepEntry
      <span className="flex items-center gap-1.5"><DeleveSymbol size={13} className="shrink-0"/>Último registro</span>
      {recordedAt&&<span className="whitespace-nowrap normal-case tracking-normal">{formatLatestTime(recordedAt)}</span>}
     </span>
-    <span className="mt-1 block text-sm text-white/70">{content.label}</span>
+    {content.label&&<span className="mt-1 block text-sm text-white/70">{content.label}</span>}
     <strong className="mt-0.5 block text-xl leading-tight tracking-tight">{content.value}</strong>
    </span>
    <ChevronRight className="size-4 shrink-0 text-white/45 transition group-hover:translate-x-1 sm:row-span-2 sm:size-6"/>
@@ -218,19 +254,41 @@ function LatestRecord({kind,recordedAt,waterTotal,waterGoal,waterWeek,sleepEntry
  </button>
 }
 
-function ExerciseCard({entry,day,week,onClick}:{entry:ExerciseEntry|null;day:ExerciseWeekDay|undefined;week:ExerciseWeek|null;onClick:()=>void}){
+function ExerciseCard({entry,day,week,onClick,celebrationId,celebrationBlocked,onCelebrationDone}:{entry:ExerciseEntry|null;day:ExerciseWeekDay|undefined;week:ExerciseWeek|null;onClick:()=>void;celebrationId:number|null;celebrationBlocked:boolean;onCelebrationDone:()=>void}){
+ const celebrationAnchorRef=useRef<HTMLSpanElement>(null);
+ const [celebrating,setCelebrating]=useState(false);
+ useEffect(()=>{
+  setCelebrating(false);
+  if(celebrationId===null||celebrationBlocked||!celebrationAnchorRef.current)return;
+  let timer:number|undefined;
+  // Wait until the form is closed and the card is visible; never celebrate behind it.
+  const observer=new IntersectionObserver(entries=>{
+   if(timer!==undefined||!entries.some(entry=>entry.isIntersecting&&entry.intersectionRatio>=.99))return;
+   setCelebrating(true);
+   observer.disconnect();
+   timer=window.setTimeout(()=>{setCelebrating(false);onCelebrationDone()},EXERCISE_CELEBRATION_MS);
+  },{threshold:.99});
+  observer.observe(celebrationAnchorRef.current);
+  return ()=>{observer.disconnect();window.clearTimeout(timer)};
+ },[celebrationId,celebrationBlocked,onCelebrationDone]);
  // Teste visual isolado: false restaura o cartão claro sem desfazer outras melhorias.
  const darkPreview = false;
- return <button onClick={onClick} className={`min-w-0 rounded-3xl p-4 text-left shadow-sm ring-1 outline-none transition hover:-translate-y-1 focus-visible:ring-4 focus-visible:ring-rose-200 ${darkPreview?"bg-black text-white ring-neutral-800 [&_strong]:text-white":"bg-white ring-stone-100"}`}>
+ return <div className="exercise-card-shell" data-celebrating={celebrating}>
+ <span ref={celebrationAnchorRef} className="exercise-celebration-anchor" aria-hidden="true"/>
+ <button onClick={onClick} className={`min-w-0 rounded-3xl p-4 text-left shadow-sm ring-1 outline-none transition hover:-translate-y-1 focus-visible:ring-4 focus-visible:ring-rose-200 ${darkPreview?"bg-black text-white ring-neutral-800 [&_strong]:text-white":"bg-white ring-stone-100"}`}>
+  <span className="exercise-card-readings">
   <span className={`grid size-10 place-items-center rounded-2xl ${darkPreview?"bg-rose-400/15 text-rose-300":"bg-rose-100 text-rose-700"}`}><Activity/></span>
   <p className={`mt-5 text-sm ${darkPreview?"text-neutral-300":"text-stone-500"}`}>Exercício</p>
   {day&&day.activityCount>1?<><b className="mt-1 block text-base leading-tight">{day.activityCount} atividades</b>
-   <span className="mt-2 flex flex-wrap gap-1.5"><Metric icon={<Timer/>} label="Tempo total" value={formatExerciseDuration(exerciseSeconds(day.totalSeconds,day.totalMinutes))} className="bg-rose-50 text-rose-700"/>{day.totalCalories>0&&<Metric icon={<Flame/>} label={calorieLabel(day.calorieSource)} value={formatCalories(day.totalCalories)} className="bg-orange-50 text-orange-600"/>}</span>
+   <span className="mt-2 flex flex-wrap gap-1.5"><Metric icon={<Timer/>} label="Tempo total" value={formatExerciseDuration(exerciseSeconds(day.totalSeconds,day.totalMinutes))} className="bg-rose-50 text-rose-700"/>{day.totalCalories>0&&<Metric icon={<Flame/>} label={calorieLabel(day.calorieSource)} value={formatCalories(day.totalCalories)} className="bg-rose-50 text-rose-700"/>}</span>
    {day.byModality.map(item=><span key={item.type} className="mt-3 block border-t border-rose-100 pt-2"><span className="block break-words text-xs font-semibold text-stone-700">{item.type}</span><span className="mt-1 flex flex-wrap gap-1.5">{item.totalKm!=null&&<Metric icon={<Route/>} label="Distância" value={formatDistance(item.totalKm)} className="bg-rose-50 text-rose-700"/>}<Metric icon={<Timer/>} label="Tempo" value={formatExerciseDuration(exerciseSeconds(item.totalSeconds,item.totalMinutes))} className="bg-rose-50 text-rose-700"/></span></span>)}
    <span className="mt-3 block text-xs font-semibold text-rose-700">Ver atividades →</span>
   </>:entry?<><b className="mt-1 block break-words text-base leading-tight">{entry.type}</b><ExerciseMetrics entry={entry} dark={darkPreview}/></>:<b className="mt-1 block text-sm">Fiz exercício</b>}
   <span className={`mt-3 block text-[11px] font-medium ${darkPreview?"text-neutral-400":"text-stone-400"}`}>Semana · {formatExerciseDuration(exerciseSeconds(week?.totalSeconds,week?.totalMinutes??0))}{week?.totalCalories?` · ${formatCalories(week.totalCalories)}${calorieSuffix(week.calorieSource)}`:""}</span>
+  </span>
  </button>
+ <span className="exercise-card-celebration" role="status" aria-live="polite" aria-atomic="true">{celebrating&&<ExerciseCelebration totalSeconds={day?exerciseSeconds(day.totalSeconds,day.totalMinutes):exerciseSeconds(entry?.durationSeconds,entry?.durationMinutes??0)}/>}</span>
+ </div>
 }
 
 function ExerciseMetrics({entry,dark=false}:{entry:ExerciseEntry;dark?:boolean}){
@@ -240,20 +298,40 @@ function ExerciseMetrics({entry,dark=false}:{entry:ExerciseEntry;dark?:boolean})
   {entry.paceSecondsPerKm!=null&&<Metric icon={<Gauge/>} label="Ritmo" value={formatPace(entry.paceSecondsPerKm)} className={base}/>}
   {entry.averageSpeedKmh!=null&&<Metric icon={<Gauge/>} label="Velocidade média" value={`${entry.averageSpeedKmh.toLocaleString("pt-BR",{maximumFractionDigits:1})} km/h`} className={base}/>}
   <Metric icon={<Timer/>} label="Tempo" value={formatExerciseDuration(exerciseSeconds(entry.durationSeconds,entry.durationMinutes))} className={base}/>
-  {entry.caloriesBurned!=null&&<Metric icon={<Flame/>} label={calorieLabel(entry.calorieSource)} value={formatCalories(entry.caloriesBurned)} className={dark?"bg-orange-400/20 text-orange-200":"bg-orange-50 text-orange-600"}/>}
+  {entry.caloriesBurned!=null&&<Metric icon={<Flame/>} label={calorieLabel(entry.calorieSource)} value={formatCalories(entry.caloriesBurned)} className={base}/>}
  </span>
 }
 
 function Metric({icon,label,value,className}:{icon:React.ReactNode;label:string;value:string;className:string}){return <span className={`inline-flex flex-col gap-1 rounded-xl px-2 py-1.5 ${className}`}><span className="flex items-center gap-1 text-[9px] font-medium"><span aria-hidden="true" className="[&>svg]:size-3">{icon}</span>{label}</span><strong className="whitespace-nowrap text-[11px] tabular-nums">{value}</strong></span>}
 
-function SleepCard({entry,week,goalHours,onClick}:{entry:SleepEntry|null;week:SleepWeek|null;goalHours:string;onClick:()=>void}){
- return <button onClick={onClick} className="min-w-0 rounded-3xl bg-white p-4 text-left shadow-sm ring-1 ring-stone-100 outline-none transition hover:-translate-y-1 focus-visible:ring-4 focus-visible:ring-indigo-200">
+function SleepCard({entry,week,goalHours,onClick,celebrationId,celebrationBlocked,onCelebrationDone}:{entry:SleepEntry|null;week:SleepWeek|null;goalHours:string;onClick:()=>void;celebrationId:number|null;celebrationBlocked:boolean;onCelebrationDone:()=>void}){
+ const celebrationAnchorRef=useRef<HTMLSpanElement>(null);
+ const [celebrating,setCelebrating]=useState(false);
+ useEffect(()=>{
+  setCelebrating(false);
+  if(celebrationId===null||celebrationBlocked||!celebrationAnchorRef.current)return;
+  let timer:number|undefined;
+  const observer=new IntersectionObserver(entries=>{
+   if(timer!==undefined||!entries.some(entry=>entry.isIntersecting&&entry.intersectionRatio>=.99))return;
+   setCelebrating(true);observer.disconnect();
+   timer=window.setTimeout(()=>{setCelebrating(false);onCelebrationDone()},SLEEP_CELEBRATION_MS);
+  },{threshold:.99});
+  observer.observe(celebrationAnchorRef.current);
+  return ()=>{observer.disconnect();window.clearTimeout(timer)};
+ },[celebrationId,celebrationBlocked,onCelebrationDone]);
+ return <div className="sleep-card-shell" data-celebrating={celebrating}>
+ <span ref={celebrationAnchorRef} className="sleep-celebration-anchor" aria-hidden="true"/>
+ <button onClick={onClick} className="min-w-0 rounded-3xl bg-white p-4 text-left shadow-sm ring-1 ring-stone-100 outline-none transition hover:-translate-y-1 focus-visible:ring-4 focus-visible:ring-indigo-200">
+  <span className="sleep-card-readings">
   <span className="grid size-10 place-items-center rounded-2xl bg-indigo-100 text-indigo-700"><MoonStar/></span>
   <p className="mt-5 text-sm text-stone-500">Sono</p>
   <b className="mt-1 block text-base leading-tight">{entry?formatDuration(entry.durationMinutes):"Registrar sono"}</b>
   {entry?<SleepMetrics entry={entry}/>:<span className="mt-2 flex flex-wrap gap-1.5"><Metric icon={<Target/>} label="Meta de sono" value={`${goalHours}h`} className="bg-indigo-50 text-indigo-700"/></span>}
   {week&&week.completedDays>0&&<span className="mt-3 block text-[11px] font-medium text-stone-400">Semana · média {formatDuration(week.averageMinutes)}</span>}
+  </span>
  </button>
+ <span className="sleep-card-celebration" role="status" aria-live="polite" aria-atomic="true">{celebrating&&entry&&<SleepCelebration durationLabel={formatDuration(entry.durationMinutes)}/>}</span>
+ </div>
 }
 
 function SleepMetrics({entry,dark=false}:{entry:SleepEntry;dark?:boolean}){
@@ -272,6 +350,30 @@ function WaterMetrics({total,goal,week,dark=false,colored=false}:{total:number;g
   <Metric icon={<Droplets/>} label={remaining>0?"Faltam hoje":"Meta atingida"} value={remaining>0?formatMilliliters(remaining):"100%"} className={base}/>
   {week&&<Metric icon={<CalendarDays/>} label="Média semanal" value={`${formatLiters(week.averageMl)}/dia`} className={base}/>}
  </span>
+}
+
+function WeightCard({summary,fallbackWeight,onClick,goalReached,celebration,celebrationBlocked,onCelebrationDone}:{summary:WeightSummary|null;fallbackWeight:number;onClick:()=>void;goalReached:boolean;celebration:WeightCelebrationEvent|null;celebrationBlocked:boolean;onCelebrationDone:()=>void}){
+ const celebrationAnchorRef=useRef<HTMLSpanElement>(null);
+ const [celebrating,setCelebrating]=useState(false);
+ useEffect(()=>{
+  setCelebrating(false);
+  if(!celebration||celebrationBlocked||!celebrationAnchorRef.current)return;
+  let timer:number|undefined;
+  const observer=new IntersectionObserver(entries=>{
+   if(timer!==undefined||!entries.some(entry=>entry.isIntersecting&&entry.intersectionRatio>=.99))return;
+   setCelebrating(true);observer.disconnect();
+   timer=window.setTimeout(()=>{setCelebrating(false);onCelebrationDone()},WEIGHT_CELEBRATION_MS);
+  },{threshold:.99});
+  observer.observe(celebrationAnchorRef.current);
+  return ()=>{observer.disconnect();window.clearTimeout(timer)};
+ },[celebration,celebrationBlocked,onCelebrationDone]);
+ return <div className="weight-card-shell" data-celebrating={celebrating} data-goal-reached={goalReached}>
+  <span ref={celebrationAnchorRef} className="weight-celebration-anchor" aria-hidden="true"/>
+  <button onClick={onClick} className="weight-card-surface min-w-0 rounded-3xl bg-white p-5 text-left shadow-sm ring-1 ring-stone-100 outline-none transition hover:-translate-y-1 focus-visible:ring-4 focus-visible:ring-amber-200">
+   <span className="weight-card-readings"><span className="flex min-w-0 items-start gap-4"><span className="weight-card-icon grid size-11 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700">{goalReached?<WeightAward kind="trophy" className="weight-goal-trophy"/>:<Scale/>}</span><span className="min-w-0"><span className="weight-card-label"><span className="text-sm text-stone-500">Peso atual</span>{goalReached&&<span className="weight-goal-badge"><Check size={12} aria-hidden="true"/>Meta alcançada</span>}</span><b className="text-xl">{formatWeight(summary?.currentWeightKg??fallbackWeight)} kg</b><WeightMetrics summary={summary}/></span></span><ChevronRight className="shrink-0 text-stone-300"/></span>
+  </button>
+  <span className="weight-card-celebration" role="status" aria-live="polite" aria-atomic="true">{celebrating&&celebration&&<WeightCelebration changeKg={celebration.changeKg} kind={celebration.kind}/>}</span>
+ </div>
 }
 
 function WeightMetrics({summary,dark=false}:{summary:WeightSummary|null;dark?:boolean}){

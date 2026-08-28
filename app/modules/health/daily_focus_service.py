@@ -21,13 +21,13 @@ def get_today_focus() -> dict | None:
 def save_today_focus(text: str) -> dict:
     normalized = " ".join(str(text or "").strip().split())
     if not 3 <= len(normalized) <= 100:
-        raise ValueError("Escreva um foco usando entre 3 e 100 caracteres.")
+        raise ValueError("Escreva um desafio usando entre 3 e 100 caracteres.")
     database = get_database()
     profile = database.execute(
         "SELECT id FROM health_profiles ORDER BY id DESC LIMIT 1"
     ).fetchone()
     if profile is None:
-        raise ValueError("Configure seu perfil antes de definir o foco do dia.")
+        raise ValueError("Configure seu perfil antes de definir seu desafio de hoje.")
     database.execute(
         """
         INSERT INTO health_daily_focus (profile_id, focus_date, focus_text)
@@ -55,7 +55,7 @@ def set_today_focus_completed(completed: bool) -> dict:
         (int(bool(completed)), date.today().isoformat()),
     )
     if cursor.rowcount == 0:
-        raise ValueError("Defina seu foco do dia antes de concluí-lo.")
+        raise ValueError("Defina seu desafio de hoje antes de concluí-lo.")
     database.commit()
     return {"completed": bool(completed)}
 

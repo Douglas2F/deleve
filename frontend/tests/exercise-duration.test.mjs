@@ -25,7 +25,8 @@ test("editing restores every time component", () => {
 
 test("duration labels retain seconds without adding noise to old records", () => {
   for (const [seconds, label] of [[0,"0min"],[1,"1s"],[59,"59s"],[60,"1min"],[1789,"29min 49s"],
-      [1800,"30min"],[3599,"59min 59s"],[3600,"1h"],[3605,"1h 5s"],[3665,"1h 1min 5s"]]) {
+      [1800,"30min"],[3599,"59min 59s"],[3600,"1h"],[3605,"1h 5s"],[3665,"1h 1min 5s"],
+      [5400,"1h 30min"],[5437,"1h 30min 37s"]]) {
     assert.equal(formatExerciseDuration(seconds), label);
   }
 });

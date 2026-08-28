@@ -1,0 +1,23 @@
+.sleep-card-shell{position:relative;display:grid;min-width:0;border-radius:1.5rem}
+.sleep-celebration-anchor{position:absolute;top:50%;left:0;right:0;height:min(180px,100%);transform:translateY(-50%);pointer-events:none}
+.sleep-card-readings{display:block}
+.sleep-card-shell[data-celebrating=true] .sleep-card-readings{opacity:0;animation:sleep-celebration-readings 4s ease both}
+.sleep-card-celebration{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none;container-type:inline-size}
+.sleep-celebration{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:12px 10px;background:#faf8ff;color:#5b21b6;isolation:isolate;animation:sleep-celebration-reveal 4s ease both}
+.sleep-celebration-glow{position:absolute;z-index:-1;inset:0;background:radial-gradient(ellipse at 50% 35%,#ddd6fe99 0%,#ede9fe55 42%,transparent 75%);animation:sleep-celebration-breathe 4s ease both}
+.sleep-celebration-sky{flex:none;width:min(96px,100%);height:64px;overflow:visible}
+.sleep-celebration-moon{transform-box:fill-box;transform-origin:center;animation:sleep-celebration-moon .9s .15s cubic-bezier(.2,.7,.2,1) both}
+.sleep-celebration-star{transform-box:fill-box;transform-origin:center;animation:sleep-celebration-star 1.6s .5s ease both}
+.sleep-celebration-star-second{animation-delay:.75s}
+.sleep-celebration-star-third{animation-delay:1s}
+.sleep-celebration-message{display:flex;flex-direction:column;align-items:center;max-width:100%;gap:3px;text-align:center;animation:sleep-celebration-copy .65s .45s ease both}
+.sleep-celebration-message strong{max-width:100%;font-size:clamp(22px,10cqi,40px);font-weight:650;line-height:1.1;letter-spacing:-.04em;font-variant-numeric:tabular-nums;color:#5b21b6}
+.sleep-celebration-message>span{font-size:12px;line-height:1.35;color:#6d28d9}
+.sleep-celebration-message>.sleep-celebration-achieved{margin-top:6px;font-size:11px;font-weight:500;color:#6b5b8b;max-width:100%;text-wrap:balance}
+@keyframes sleep-celebration-reveal{0%,100%{opacity:0}12%,84%{opacity:1}}
+@keyframes sleep-celebration-readings{0%,100%{opacity:1}12%,84%{opacity:0}}
+@keyframes sleep-celebration-breathe{0%{opacity:0;scale:.8}45%,70%{opacity:1;scale:1.05}100%{opacity:0;scale:1.12}}
+@keyframes sleep-celebration-moon{from{opacity:0;translate:0 5px;rotate:-8deg}to{opacity:1;translate:0 0;rotate:0deg}}
+@keyframes sleep-celebration-star{0%{opacity:0;scale:.6}55%{opacity:1;scale:1.1}100%{opacity:.75;scale:1}}
+@keyframes sleep-celebration-copy{from{opacity:0;translate:0 6px}to{opacity:1;translate:0 0}}
+@media(prefers-reduced-motion:reduce){.sleep-celebration,.sleep-celebration-glow,.sleep-celebration-moon,.sleep-celebration-star,.sleep-celebration-message,.sleep-card-shell[data-celebrating=true] .sleep-card-readings{animation:none}}
