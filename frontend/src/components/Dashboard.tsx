@@ -8,6 +8,7 @@ import SleepDialog, { SleepEntry, SleepWeek } from "./SleepDialog";
 import WeightDialog, { WeightSummary } from "./WeightDialog";
 import WeeklyReport from "./WeeklyReport";
 import WaterWeekDialog, { WaterWeek } from "./WaterWeekDialog";
+import WaterAmountDialog from "./WaterAmountDialog";
 import ProfileDialog from "./ProfileDialog";
 import FocusOfDay from "./FocusOfDay";
 import WaterAnimation from "./WaterAnimation";
@@ -20,7 +21,7 @@ import WeightCelebration, { WEIGHT_CELEBRATION_MS, type WeightCelebrationEvent }
 import WeightAward from "./WeightAward";
 import { sleepMilestone, exerciseMilestone, weightRewardKind, weightChangeKg, isWeightGoalReached, type ExerciseSaveContext } from "./healthMilestones";
 
-export type HealthProfile={name:string;heightCm:string;weightKg:string;goal:string;goals:string[];sleepGoalHours:string;waterGoalMl:string;exerciseDaysWeek:string;targetWeightKg:string};
+export type HealthProfile={waterPortionMl?:number;name:string;heightCm:string;weightKg:string;goal:string;goals:string[];sleepGoalHours:string;waterGoalMl:string;exerciseDaysWeek:string;targetWeightKg:string};
 
 type WaterResponse={totalMl:number;error?:string};
 type LatestKind="water"|"sleep"|"exercise"|"weight";
@@ -28,9 +29,12 @@ type LatestKind="water"|"sleep"|"exercise"|"weight";
 export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProfile;onProfileUpdated:(profile:HealthProfile)=>void}){
  const firstName=profile.name.trim().split(" ")[0];
  const waterGoal=Math.max(Number(profile.waterGoalMl)||2000,1);
+ const waterPortion=profile.waterPortionMl??250;
  const [waterTotal,setWaterTotal]=useState(0);
  const [waterError,setWaterError]=useState("");
  const [savingWater,setSavingWater]=useState(false);
+ const [waterAmountOpen,setWaterAmountOpen]=useState(false);
+ const waterRequest=useRef(false);
  const [waterMotionPaused,setWaterMotionPaused]=useState(false);
  const [waterCelebrating,setWaterCelebrating]=useState(false);
  const [sleepEntry,setSleepEntry]=useState<SleepEntry|null>(null);
@@ -82,6 +86,16 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
 
  useEffect(()=>{setWeightCelebration(null)},[profile.goal,profile.targetWeightKg]);
 
+ function updateCorrectedWeight(summary:WeightSummary){
+  setWeightCelebration(null);setWeightSummary(summary);
+  fetch("/api/health/latest-activity").then(response=>response.ok?response.json():Promise.reject())
+   .then((body:{activity:{kind:LatestKind;recordedAt:string}|null})=>{
+    setLatestKind(body.activity?.kind??"water");setLatestAt(body.activity?.recordedAt??"");
+    if(body.activity)localStorage.setItem("deleve-latest-health",body.activity.kind);
+    else localStorage.removeItem("deleve-latest-health");
+   }).catch(()=>undefined);
+ }
+
  useEffect(()=>{
   if(!waterCelebrating)return;
   const timer=window.setTimeout(()=>setWaterCelebrating(false),WATER_GOAL_CELEBRATION_MS);
@@ -89,6 +103,16 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
  },[waterCelebrating]);
 
  // Only saved user actions celebrate; loading the page or changing goals does not.
+ function updateCorrectedWater(total:number){
+  setWaterTotal(total);setWaterCelebrating(false);
+  fetch("/api/health/latest-activity").then(response=>response.ok?response.json():Promise.reject())
+   .then((body:{activity:{kind:LatestKind;recordedAt:string}|null})=>{
+    setLatestKind(body.activity?.kind??"water");setLatestAt(body.activity?.recordedAt??"");
+    if(body.activity)localStorage.setItem("deleve-latest-health",body.activity.kind);
+    else localStorage.removeItem("deleve-latest-health");
+   }).catch(()=>undefined);
+ }
+
  function updateRecordedWater(total:number){
   if(crossedWaterGoal(waterTotal,total,waterGoal))setWaterCelebrating(true);
   else if(total<waterGoal)setWaterCelebrating(false);
@@ -113,7 +137,7 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
  useEffect(()=>{
   fetch("/api/health/latest-activity")
    .then(async response=>response.ok?response.json():Promise.reject())
-   .then((body:{activity:{kind:LatestKind;recordedAt:string}|null})=>{if(body.activity){setLatestKind(body.activity.kind);setLatestAt(body.activity.recordedAt)}})
+   .then((body:{activity:{kind:LatestKind;recordedAt:string}|null})=>{if(body.activity){setLatestKind(body.activity.kind);setLatestAt(body.activity.recordedAt)}else{setLatestKind("water");setLatestAt("");localStorage.removeItem("deleve-latest-health")}})
    .catch(()=>undefined);
  },[]);
 
@@ -168,23 +192,39 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
    .catch(()=>undefined);
  },[]);
 
- async function addGlass(){
-  if(savingWater)return;
+ async function saveWaterPortion(amountMl:number):Promise<boolean>{
+  if(waterRequest.current)return false;
+  waterRequest.current=true;setSavingWater(true);setWaterError("");
+  try{
+   const response=await fetch("/api/health/water/portion",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({amountMl})});
+   const body=await response.json();
+   if(!response.ok)throw new Error(body.error??"Não foi possível salvar o tamanho.");
+   onProfileUpdated(body);return true;
+  }catch(caught){setWaterError(caught instanceof Error?caught.message:"Não foi possível salvar o tamanho.");return false}
+  finally{waterRequest.current=false;setSavingWater(false)}
+ }
+
+ async function addGlass(amountMl=waterPortion):Promise<boolean>{
+  if(waterRequest.current)return false;
+  waterRequest.current=true;
   setSavingWater(true);setWaterError("");
   try{
-   const response=await fetch("/api/health/water",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amountMl:250})});
+   const response=await fetch("/api/health/water",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amountMl})});
    const body=await response.json().catch(()=>({})) as WaterResponse;
    if(!response.ok)throw new Error(body.error??"Não foi possível registrar a água.");
    updateRecordedWater(body.totalMl);
    markLatest("water");
    refreshWaterWeek();
+   return true;
   }catch(caught){
    setWaterError(caught instanceof Error?caught.message:"Não foi possível registrar a água.");
-  }finally{setSavingWater(false)}
+   return false;
+  }finally{waterRequest.current=false;setSavingWater(false)}
  }
 
  async function removeLastGlass(){
-  if(savingWater||waterTotal<=0)return;
+  if(waterRequest.current||waterTotal<=0)return;
+  waterRequest.current=true;
   setSavingWater(true);setWaterError("");
   try{
    const response=await fetch("/api/health/water/latest",{method:"DELETE"});
@@ -194,7 +234,7 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
    refreshWaterWeek();
   }catch(caught){
    setWaterError(caught instanceof Error?caught.message:"Não foi possível desfazer o último registro.");
-  }finally{setSavingWater(false)}
+  }finally{waterRequest.current=false;setSavingWater(false)}
  }
 
  return <main className="min-h-screen bg-[#f6f8f6] text-stone-900"><section className="mx-auto min-h-screen max-w-5xl px-5 pb-28 pt-7 md:px-10">
@@ -209,9 +249,9 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
      {waterCelebrating&&<WaterGoalCelebration paused={waterMotionPaused}/>}
     </div>
     <div className="water-card-content">
-    <div className="flex justify-between"><button type="button" aria-label={waterMotionPaused?"Retomar animação da água":"Pausar animação da água"} title={waterMotionPaused?"Retomar animação":"Pausar animação"} onClick={()=>setWaterMotionPaused(value=>!value)} className="water-motion-control grid size-11 place-items-center rounded-2xl bg-white/20 outline-none hover:bg-white/30 focus-visible:ring-2 focus-visible:ring-white"><Droplets aria-hidden="true"/><span className="water-motion-indicator">{waterMotionPaused?<Play size={10} aria-hidden="true"/>:<Pause size={10} aria-hidden="true"/>}</span></button><span aria-hidden="true" className="water-static-icon size-11 place-items-center rounded-2xl bg-white/20"><Droplets/></span><div className="flex gap-2"><button aria-label="Desfazer último registro de água" disabled={savingWater||waterTotal<=0} onClick={removeLastGlass} className="grid size-10 place-items-center rounded-full bg-white/20 text-white transition hover:bg-white/30 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-40"><Minus/></button><button aria-label="Adicionar um copo de água" disabled={savingWater} onClick={addGlass} className="grid size-10 place-items-center rounded-full bg-white text-sky-700 transition hover:scale-105 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-60"><Plus/></button></div></div>
-    <p className="mt-2 text-right text-[10px] font-medium text-white/80">250 ml por toque</p>
-    <div className="water-card-readings"><div className="water-card-label"><p className="text-sm text-sky-100">Água</p>{waterGoalReached&&<span className="water-goal-badge"><Check size={13} strokeWidth={2.5} aria-hidden="true"/>Meta atingida</span>}</div><p className="mt-1 text-3xl font-semibold">{formatMilliliters(waterTotal)}</p>
+    <div className="flex justify-between"><button type="button" aria-label={waterMotionPaused?"Retomar animação da água":"Pausar animação da água"} title={waterMotionPaused?"Retomar animação":"Pausar animação"} onClick={()=>setWaterMotionPaused(value=>!value)} className="water-motion-control grid size-11 place-items-center rounded-2xl bg-white/20 outline-none hover:bg-white/30 focus-visible:ring-2 focus-visible:ring-white"><Droplets aria-hidden="true"/><span className="water-motion-indicator">{waterMotionPaused?<Play size={10} aria-hidden="true"/>:<Pause size={10} aria-hidden="true"/>}</span></button><span aria-hidden="true" className="water-static-icon size-11 place-items-center rounded-2xl bg-white/20"><Droplets/></span><div className="flex gap-2"><button aria-label="Desfazer último registro de água" disabled={savingWater||waterTotal<=0} onClick={removeLastGlass} className="grid size-10 place-items-center rounded-full bg-white/20 text-white transition hover:bg-white/30 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-40"><Minus/></button><button aria-label={`Adicionar ${waterPortion} ml de água`} disabled={savingWater} onClick={()=>void addGlass()} className="grid size-10 place-items-center rounded-full bg-white text-sky-700 transition hover:scale-105 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-60"><Plus/></button></div></div>
+    <p className="mt-2 text-right text-[10px] font-medium text-white/80">{waterPortion.toLocaleString("pt-BR")} ml por toque</p>
+    <div className="water-card-readings"><div className="water-card-label"><p className="text-sm text-sky-100">Água</p>{waterGoalReached&&<span className="water-goal-badge"><Check size={13} strokeWidth={2.5} aria-hidden="true"/>Meta atingida</span>}</div><button type="button" disabled={savingWater} onClick={()=>{setWaterError("");setWaterAmountOpen(true)}} aria-label={`Escolher quantidade de água. Total de hoje: ${formatMilliliters(waterTotal)}`} aria-haspopup="dialog" className="mt-1 flex min-h-11 items-center gap-2 rounded-xl text-left text-3xl font-semibold outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white disabled:opacity-60">{formatMilliliters(waterTotal)}<ChevronRight size={17} className="opacity-60" aria-hidden="true"/></button>
     <div className="mt-4 h-2 rounded-full bg-white/20"><div className="h-full rounded-full bg-white transition-[width] duration-300" style={{width:`${waterProgress}%`}}/></div>
     <WaterMetrics total={waterTotal} goal={waterGoal} week={waterWeek} colored/></div><div className="mt-3 flex items-center justify-end"><button onClick={()=>setWaterWeekOpen(true)} className="min-h-11 rounded-xl px-3 text-xs font-bold text-white outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white">Ver semana</button></div>
     {waterError&&<p role="alert" className="mt-3 rounded-xl bg-white/15 p-3 text-sm">{waterError}</p>}
@@ -224,7 +264,7 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
    </div>
   </section>
   <section className="mt-5 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-100"><div className="flex justify-between"><div><p className="text-sm text-stone-500">Progresso de hoje</p><h3 className="mt-1 text-xl font-semibold">{completedRecords?`${completedRecords} registro${completedRecords>1?"s":""} concluído${completedRecords>1?"s":""}`:"Comece com um registro"}</h3></div><span className="text-sm font-semibold text-emerald-700">{completedRecords} de 3</span></div><div className="mt-5 h-2 rounded-full bg-stone-100"><div className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-cyan-500 transition-[width] duration-300" style={{width:`${completedRecords?Math.round((completedRecords/3)*100):4}%`}}/></div><p className="mt-4 text-sm text-stone-500">Sem pressão. Cada pequeno registro já conta.</p><button onClick={()=>setWeeklyReportOpen(true)} className="mt-5 flex min-h-12 w-full items-center justify-between rounded-2xl bg-emerald-50 px-4 text-sm font-bold text-emerald-800 outline-none transition hover:bg-emerald-100 focus-visible:ring-4 focus-visible:ring-emerald-200"><span className="flex items-center gap-2"><CalendarDays size={18}/>Ver relatório semanal</span><ChevronRight size={18}/></button></section>
- </section><ProfileDialog open={profileOpen} profile={profile} onClose={()=>setProfileOpen(false)} onSaved={onProfileUpdated}/><SleepDialog open={sleepDialogOpen} onClose={()=>setSleepDialogOpen(false)} onSaved={updateRecordedSleep} onDeletedToday={()=>{setSleepEntry(null);markLatest("water")}} onWeekChanged={setSleepWeek} initialEntry={sleepEntry}/><ExerciseDialog open={exerciseDialogOpen} onClose={()=>setExerciseDialogOpen(false)} onChanged={updateExerciseWeek}/><WeightDialog open={weightDialogOpen} onClose={()=>setWeightDialogOpen(false)} onSaved={updateRecordedWeight} summary={weightSummary} fallbackWeight={profile.weightKg}/><WaterWeekDialog open={waterWeekOpen} onClose={()=>setWaterWeekOpen(false)} week={waterWeek} onWeekChanged={setWaterWeek} onTodayChanged={total=>{updateRecordedWater(total);markLatest("water")}}/><WeeklyReport open={weeklyReportOpen} onClose={()=>setWeeklyReportOpen(false)}/></main>
+ </section><WaterAmountDialog open={waterAmountOpen} busy={savingWater} error={waterError} onClose={()=>setWaterAmountOpen(false)} onAdd={addGlass} portion={waterPortion} onSavePortion={saveWaterPortion}/><ProfileDialog open={profileOpen} profile={profile} onClose={()=>setProfileOpen(false)} onSaved={onProfileUpdated}/><SleepDialog open={sleepDialogOpen} onClose={()=>setSleepDialogOpen(false)} onSaved={updateRecordedSleep} onDeletedToday={()=>{setSleepEntry(null);markLatest("water")}} onWeekChanged={setSleepWeek} initialEntry={sleepEntry}/><ExerciseDialog open={exerciseDialogOpen} onClose={()=>setExerciseDialogOpen(false)} onChanged={updateExerciseWeek}/><WeightDialog open={weightDialogOpen} onClose={()=>setWeightDialogOpen(false)} onSaved={updateRecordedWeight} onCorrected={updateCorrectedWeight} summary={weightSummary} fallbackWeight={profile.weightKg}/><WaterWeekDialog open={waterWeekOpen} onClose={()=>setWaterWeekOpen(false)} week={waterWeek} onWeekChanged={setWaterWeek} onTodayChanged={(total,deleted)=>{if(deleted)updateCorrectedWater(total);else{updateRecordedWater(total);markLatest("water")}}}/><WeeklyReport open={weeklyReportOpen} onClose={()=>setWeeklyReportOpen(false)}/></main>
 }
 
 function LatestRecord({kind,recordedAt,waterTotal,waterGoal,waterWeek,sleepEntry,exerciseEntry,exerciseCount,weight,weightSummary,onOpen}:{kind:LatestKind;recordedAt:string;waterTotal:number;waterGoal:number;waterWeek:WaterWeek|null;sleepEntry:SleepEntry|null;exerciseEntry:ExerciseEntry|null;exerciseCount:number;weight:number;weightSummary:WeightSummary|null;onOpen:()=>void}){

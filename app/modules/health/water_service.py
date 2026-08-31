@@ -6,22 +6,32 @@ from app.core.database import get_database
 DEFAULT_GLASS_ML = 250
 
 
-def add_water_entry(amount_ml: int = DEFAULT_GLASS_ML, water_date: str | None = None) -> dict:
-    """Registra água hoje ou em um dia já decorrido da semana atual."""
-    try:
-        amount = int(amount_ml)
-    except (TypeError, ValueError) as error:
-        raise ValueError("Informe uma quantidade de água válida.") from error
+def set_water_portion(amount_ml):
+    if type(amount_ml) is not int or not 50 <= amount_ml <= 2000:
+        raise ValueError("Informe um tamanho inteiro entre 50 e 2.000 ml.")
+    database = get_database()
+    cursor = database.execute("UPDATE health_profiles SET water_portion_ml = ? WHERE id = (SELECT id FROM health_profiles ORDER BY id DESC LIMIT 1)", (amount_ml,))
+    if cursor.rowcount != 1:
+        database.rollback()
+        raise ValueError("Configure seu perfil antes de escolher o tamanho do copo ou garrafa.")
+    database.commit()
 
-    if not 50 <= amount <= 2000:
-        raise ValueError("A quantidade deve ficar entre 50 e 2000 ml.")
+
+def add_water_entry(amount_ml: int | None = None, water_date: str | None = None) -> dict:
+    """Registra água hoje ou em uma data anterior."""
+    if amount_ml is not None:
+        try:
+            amount_ml = int(amount_ml)
+        except (TypeError, ValueError) as error:
+            raise ValueError("Informe uma quantidade de água válida.") from error
+        if not 50 <= amount_ml <= 2000:
+            raise ValueError("A quantidade deve ficar entre 50 e 2000 ml.")
 
     database = get_database()
-    profile = database.execute(
-        "SELECT id FROM health_profiles ORDER BY id DESC LIMIT 1"
-    ).fetchone()
+    profile = database.execute("SELECT id, water_portion_ml FROM health_profiles ORDER BY id DESC LIMIT 1").fetchone()
     if profile is None:
         raise ValueError("Configure seu perfil antes de registrar água.")
+    amount = profile["water_portion_ml"] if amount_ml is None else amount_ml
 
     selected_date = _parse_water_date(water_date)
 
@@ -95,6 +105,55 @@ def remove_latest_water_entry() -> dict:
     }
 
 
+def clear_water_day(water_date: str, expected_total: int) -> dict:
+    selected = _parse_water_date(water_date)
+    if not water_date or type(expected_total) is not int or expected_total < 0:
+        raise ValueError("Confirme a data e o total de água que deseja zerar.")
+    database = get_database()
+    try:
+        database.execute("BEGIN IMMEDIATE")
+        profile = database.execute("SELECT id FROM health_profiles ORDER BY id DESC LIMIT 1").fetchone()
+        if profile is None:
+            raise ValueError("Configure seu perfil antes de alterar a água.")
+        total = get_water_total_for_date(selected, profile["id"])
+        if total != expected_total:
+            raise ValueError("O total deste dia mudou. Selecione a data novamente antes de zerar.")
+        database.execute("DELETE FROM health_water_entries WHERE profile_id = ? AND date(recorded_at, 'localtime') = ?", (profile["id"], selected.isoformat()))
+        database.commit()
+        return {"waterDate": selected.isoformat(), "removedAmountMl": total, "totalMl": 0}
+    except Exception:
+        database.rollback()
+        raise
+
+
+def delete_water_entry(entry_id: int) -> dict:
+    database = get_database()
+    try:
+        database.execute("BEGIN IMMEDIATE")
+        entry = database.execute("""
+            SELECT id, profile_id, amount_ml, date(recorded_at, 'localtime') AS water_date
+            FROM health_water_entries WHERE id = ?
+            AND profile_id = (SELECT id FROM health_profiles ORDER BY id DESC LIMIT 1)
+        """, (entry_id,)).fetchone()
+        if entry is None:
+            raise LookupError("Registro de água não encontrado.")
+        selected = _parse_water_date(entry["water_date"])
+        database.execute("DELETE FROM health_water_entries WHERE id = ? AND profile_id = ?", (entry_id, entry["profile_id"]))
+        total = get_water_total_for_date(selected, entry["profile_id"])
+        database.commit()
+        return {"deleted": True, "id": entry_id, "waterDate": selected.isoformat(),
+                "removedAmountMl": entry["amount_ml"], "totalMl": total}
+    except Exception:
+        database.rollback()
+        raise
+
+
+def get_water_week_for_date(value: str | None = None) -> dict:
+    selected = _parse_water_date(value)
+    end = selected + timedelta(days=6 - selected.weekday())
+    return get_weekly_water_summary(min(end, date.today()))
+
+
 def get_weekly_water_summary(reference_date: date | None = None) -> dict:
     """Calcula a média usando somente os dias decorridos da semana, incluindo hoje."""
     database = get_database()
@@ -114,9 +173,15 @@ def get_weekly_water_summary(reference_date: date | None = None) -> dict:
         WHERE profile_id = ? AND date(recorded_at, 'localtime') BETWEEN ? AND ?
         GROUP BY date(recorded_at, 'localtime')
         """,
-        (profile["id"], week_start.isoformat(), week_end.isoformat()),
+        (profile["id"], week_start.isoformat(), today.isoformat()),
     ).fetchall()
     totals = {row["entry_date"]: int(row["total_ml"]) for row in rows}
+    entries = database.execute("""
+        SELECT id, amount_ml, date(recorded_at, 'localtime') AS entry_date
+        FROM health_water_entries
+        WHERE profile_id = ? AND date(recorded_at, 'localtime') BETWEEN ? AND ?
+        ORDER BY id
+    """, (profile["id"], week_start.isoformat(), today.isoformat())).fetchall()
     goal_ml = int(profile["water_goal_ml"] or 0)
     days = []
     for offset in range(7):
@@ -125,9 +190,11 @@ def get_weekly_water_summary(reference_date: date | None = None) -> dict:
         days.append(
             {
                 "date": current.isoformat(),
-                "isToday": current == today,
+                "isToday": current == date.today(),
                 "isFuture": current > today,
                 "totalMl": total_ml,
+                "entries": [{"id": entry["id"], "amountMl": entry["amount_ml"]}
+                            for entry in entries if entry["entry_date"] == current.isoformat()],
                 "metGoal": bool(goal_ml and total_ml >= goal_ml),
             }
         )
@@ -150,9 +217,6 @@ def _parse_water_date(value: str | None) -> date:
         selected_date = date.fromisoformat(str(value))
     except ValueError as error:
         raise ValueError("Informe uma data válida para o registro de água.") from error
-    week_start = today - timedelta(days=today.weekday())
     if selected_date > today:
         raise ValueError("Não é possível registrar água em uma data futura.")
-    if selected_date < week_start:
-        raise ValueError("Escolha um dia da semana atual.")
     return selected_date

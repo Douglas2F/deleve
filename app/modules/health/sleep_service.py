@@ -4,7 +4,7 @@ from app.core.database import get_database
 
 
 def save_sleep(bedtime: str, wake_time: str, sleep_date: str | None = None) -> dict:
-    """Cria ou atualiza um registro de sono da semana atual."""
+    """Cria ou atualiza o sono na data em que a pessoa acordou."""
     bedtime_value = _parse_time(bedtime, "horário de dormir")
     wake_time_value = _parse_time(wake_time, "horário de acordar")
     wake_datetime = wake_time_value
@@ -72,6 +72,10 @@ def _parse_time(value: str, field_name: str) -> datetime:
         raise ValueError(f"Informe um {field_name} válido.") from error
 
 
+def get_sleep_week_for_date(value: str | None = None) -> dict:
+    return get_weekly_sleep_summary(_parse_sleep_date(value))
+
+
 def get_weekly_sleep_summary(reference_date: date | None = None) -> dict:
     database = get_database()
     profile = database.execute(
@@ -89,7 +93,7 @@ def get_weekly_sleep_summary(reference_date: date | None = None) -> dict:
         WHERE profile_id = ? AND sleep_date BETWEEN ? AND ?
         ORDER BY sleep_date
         """,
-        (profile["id"], week_start.isoformat(), week_end.isoformat()),
+        (profile["id"], week_start.isoformat(), min(week_end, date.today()).isoformat()),
     ).fetchall()
     entries = {row["sleep_date"]: row for row in rows}
     goal_minutes = int(float(profile["sleep_goal_hours"] or 0) * 60)
@@ -100,7 +104,7 @@ def get_weekly_sleep_summary(reference_date: date | None = None) -> dict:
         days.append(
             {
                 "date": current.isoformat(),
-                "isToday": current == today,
+                "isToday": current == date.today(),
                 "hasSleep": row is not None,
                 "bedtime": row["bedtime"] if row else None,
                 "wakeTime": row["wake_time"] if row else None,
@@ -143,9 +147,6 @@ def _parse_sleep_date(value: str | None) -> date:
         except ValueError as error:
             raise ValueError("Informe uma data de sono válida.") from error
     today = date.today()
-    week_start = today - timedelta(days=today.weekday())
     if selected > today:
         raise ValueError("Não é possível registrar sono em uma data futura.")
-    if selected < week_start:
-        raise ValueError("Nesta tela, registre apenas os dias da semana atual.")
     return selected

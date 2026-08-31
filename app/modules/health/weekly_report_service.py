@@ -4,22 +4,63 @@ from app.core.database import get_database
 from app.modules.health.exercise_service import get_weekly_exercise_summary
 
 
-def get_weekly_health_report(reference_date: date | None = None) -> dict:
-    """Reúne métricas da semana atual sem transformar dados em recomendações médicas."""
+def get_weekly_health_report(reference_date: date | None = None, week_offset: int = 0) -> dict:
+    report = _get_week_report(reference_date, week_offset)
+    try:
+        previous_cutoff = date.fromisoformat(report["referenceDate"]) - timedelta(days=7)
+    except OverflowError:
+        report["previousComparison"] = None
+        return report
+    # Reuse the same aggregation and current goals, ending on the same weekday.
+    previous = _get_week_report(previous_cutoff)
+    comparison = {
+        "startDate": previous["startDate"],
+        "endDate": previous["referenceDate"],
+    }
+    for area, metric, goal in [("water", "goalDays", "goalMl"),
+                               ("sleep", "goalDays", "goalMinutes"),
+                               ("exercise", "completedDays", None)]:
+        current, prior = report[area], previous[area]
+        records = "completedDays" if area == "exercise" else "recordedDays"
+        available = bool(current[records] and prior[records] and (goal is None or current[goal] > 0))
+        comparison[area] = {
+            "available": available,
+            "current": current[metric], "previous": prior[metric],
+            "difference": current[metric] - prior[metric] if available else None,
+        }
+    current, prior = report["weight"], previous["weight"]
+    available = bool(current["latestDate"] and prior["latestDate"])
+    comparison["weight"] = {
+        "available": available,
+        "difference": round(current["currentWeightKg"] - prior["currentWeightKg"], 1) if available else None,
+        "currentDate": current["latestDate"], "previousDate": prior["latestDate"],
+        "goalDirection": current["goalDirection"],
+    }
+    report["previousComparison"] = comparison
+    return report
+
+
+def _get_week_report(reference_date: date | None = None, week_offset: int = 0) -> dict:
+    """Consulta uma semana sem alterar registros; a semana atual termina em hoje."""
+    if type(week_offset) is not int or week_offset > 0:
+        raise ValueError("Escolha a semana atual ou uma semana anterior.")
+    today = reference_date or date.today()
+    try:
+        week_start = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
+        week_end = week_start + timedelta(days=6)
+    except OverflowError as error:
+        raise ValueError("Semana fora do intervalo de datas permitido.") from error
+    cutoff = min(today, week_end)
+    elapsed_days = (cutoff - week_start).days + 1
     database = get_database()
     profile = database.execute(
         """
-        SELECT id, current_weight_kg, water_goal_ml, sleep_goal_hours
+        SELECT id, current_weight_kg, water_goal_ml, sleep_goal_hours, goal
         FROM health_profiles ORDER BY id DESC LIMIT 1
         """
     ).fetchone()
     if profile is None:
         raise ValueError("Configure seu perfil antes de visualizar o relatório.")
-
-    today = reference_date or date.today()
-    week_start = today - timedelta(days=today.weekday())
-    week_end = week_start + timedelta(days=6)
-    elapsed_days = (today - week_start).days + 1
 
     water_rows = database.execute(
         """
@@ -28,7 +69,7 @@ def get_weekly_health_report(reference_date: date | None = None) -> dict:
         WHERE profile_id = ? AND date(recorded_at, 'localtime') BETWEEN ? AND ?
         GROUP BY date(recorded_at, 'localtime')
         """,
-        (profile["id"], week_start.isoformat(), today.isoformat()),
+        (profile["id"], week_start.isoformat(), cutoff.isoformat()),
     ).fetchall()
     water_total = sum(row["total_ml"] for row in water_rows)
     water_goal = int(profile["water_goal_ml"] or 0)
@@ -39,7 +80,7 @@ def get_weekly_health_report(reference_date: date | None = None) -> dict:
         WHERE profile_id = ? AND sleep_date BETWEEN ? AND ?
         ORDER BY sleep_date
         """,
-        (profile["id"], week_start.isoformat(), today.isoformat()),
+        (profile["id"], week_start.isoformat(), cutoff.isoformat()),
     ).fetchall()
     sleep_goal_minutes = int(float(profile["sleep_goal_hours"] or 0) * 60)
     sleep_total = sum(row["duration_minutes"] for row in sleep_rows)
@@ -59,7 +100,7 @@ def get_weekly_health_report(reference_date: date | None = None) -> dict:
             })
         return days
 
-    exercise = get_weekly_exercise_summary(today)
+    exercise = get_weekly_exercise_summary(cutoff)
     modalities = []
     for item in exercise["byModality"]:
         modalities.append(item["type"])
@@ -70,9 +111,12 @@ def get_weekly_health_report(reference_date: date | None = None) -> dict:
         WHERE profile_id = ? AND recorded_on BETWEEN ? AND ?
         ORDER BY recorded_on, id
         """,
-        (profile["id"], week_start.isoformat(), today.isoformat()),
+        (profile["id"], week_start.isoformat(), cutoff.isoformat()),
     ).fetchall()
-    current_weight = float(weight_rows[-1]["weight_kg"]) if weight_rows else float(profile["current_weight_kg"])
+    # Never present today's profile weight as a measurement from a past week.
+    current_weight = float(weight_rows[-1]["weight_kg"]) if weight_rows else (
+        float(profile["current_weight_kg"]) if week_offset == 0 else None
+    )
     weekly_weight_change = (
         round(float(weight_rows[-1]["weight_kg"]) - float(weight_rows[0]["weight_kg"]), 1)
         if len(weight_rows) > 1
@@ -82,10 +126,15 @@ def get_weekly_health_report(reference_date: date | None = None) -> dict:
     recorded_areas = sum(
         [water_total > 0, bool(sleep_rows), exercise["completedDays"] > 0, bool(weight_rows)]
     )
+    goals = {item.strip() for item in (profile["goal"] or "").split(",")}
+    losing, gaining = "Perder peso" in goals, "Ganhar peso" in goals
+    weight_direction = (-1 if losing else 1) if losing != gaining and "Manter peso" not in goals else 0
     return {
         "startDate": week_start.isoformat(),
         "endDate": week_end.isoformat(),
-        "referenceDate": today.isoformat(),
+        "referenceDate": cutoff.isoformat(),
+        "weekOffset": week_offset,
+        "isCurrentWeek": week_offset == 0,
         "elapsedDays": elapsed_days,
         "recordedAreas": recorded_areas,
         "summary": _build_summary(recorded_areas),
@@ -117,8 +166,17 @@ def get_weekly_health_report(reference_date: date | None = None) -> dict:
             "manualCalories": exercise["manualCalories"],
             "modalities": modalities,
             "distanceByModality": exercise["distanceByModality"],
+            "days": [{
+                "date": day["date"],
+                "isFuture": day["date"] > today.isoformat(),
+                "activityCount": day["activityCount"],
+                "totalSeconds": day["totalSeconds"],
+                "totalMinutes": day["totalMinutes"],
+                "entries": day["entries"],
+            } for day in exercise["days"]],
         },
         "weight": {
+            "goalDirection": weight_direction,
             "currentWeightKg": current_weight,
             "weeklyChangeKg": weekly_weight_change,
             "recordedDays": len(weight_rows),

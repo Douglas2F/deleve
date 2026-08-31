@@ -33,6 +33,9 @@ def initialize_database() -> None:
 
 def _apply_migrations(database: sqlite3.Connection) -> None:
     """Atualiza bancos já existentes sem apagar os registros do usuário."""
+    profile_columns = {row["name"] for row in database.execute("PRAGMA table_info(health_profiles)")}
+    if "water_portion_ml" not in profile_columns:
+        database.execute("ALTER TABLE health_profiles ADD COLUMN water_portion_ml INTEGER NOT NULL DEFAULT 250 CHECK (water_portion_ml BETWEEN 50 AND 2000)")
     exercise_columns = {
         row["name"]
         for row in database.execute("PRAGMA table_info(health_exercise_entries)").fetchall()

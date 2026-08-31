@@ -1,5 +1,128 @@
 # Relatório semanal
 
+## Água simplificada: Zerar — 31/08/2026
+
+- Por preferência do usuário, lista de consumos retirada da interface. Apenas Zerar em texto cinza discreto abaixo da quantidade.
+- Confirmação neutra, sem vermelho, indica a data selecionada. Zera somente aquele dia no perfil atual, preservando outros dias e metas.
+- Total conferido antes da exclusão para bloquear confirmação desatualizada. Exclusão de hoje não celebra; resumos recalculados.
+- 289 testes aprovados, 2 ignorados; TypeScript/build aprovados. Interface, cancelamento e confirmação testados com dados fictícios.
+
+## Exclusão individual e calendário compacto — 31/08/2026
+
+- Água: cada dia mostra todos os consumos separados, com lixeira e confirmação para excluir qualquer registro pelo ID, não apenas o último. Exclusão limitada ao perfil atual e recalcula o total e o relatório.
+- Registro antigo não altera hoje; exclusão de hoje atualiza o cartão e consulta novamente o último registro sem disparar celebração.
+- Calendário de água reduzido de 80 para 56 px de altura mínima, com seleção azul suave e borda fina, sem destaque preto.
+- Sono e exercício já permitem exclusão no dia selecionado. Histórico de peso agora oferece Ver pesagens anteriores, removendo o limite que escondia registros além dos últimos 12. Peso inicial do perfil permanece como referência, não como pesagem excluível.
+- Testes: 281 aprovados, 2 ignorados; TypeScript/build aprovados. No navegador, exclusão dos 900 ml intermediários manteve 250 ml e 750 ml; cancelamento e layout de 320 px conferidos em banco fictício.
+
+## Água em datas anteriores — 31/08/2026
+
+- Em Água → Ver semana, o campo Data do consumo permite escolher dias e semanas anteriores, com atalho Hoje. O + principal continua registrando somente hoje.
+- Semana passada considera os sete dias na média; semana atual considera os dias decorridos. Registro antigo não modifica o total de hoje, a preferência do recipiente nem sua celebração.
+- Confirmação com quantidade e data após salvar; campo de quantidade limpo para evitar repetição acidental. Bloqueio de gravação dupla e de troca de data durante o envio.
+- Datas futuras bloqueadas; relatório recebe a água na semana correta. Números e unidade separados no calendário pequeno para evitar transbordamento.
+- Validação: 270 testes backend aprovados, 2 ignorados; TypeScript/build aprovados. Teste isolado de 900 ml no sábado anterior manteve 2.000 ml em hoje; layout conferido em 320 e 390 px.
+
+## Sono em datas anteriores — 31/08/2026
+
+- Seletor Data em que acordou, inicialmente em hoje, com acesso a semanas anteriores e atalho Hoje.
+- Horários existentes carregados ao escolher o dia; Salvar alterações identifica a edição de uma noite já registrada. Datas futuras bloqueadas.
+- Sono antigo atualiza a semana correspondente sem substituir o cartão de hoje nem acionar sua celebração; exclusão preserva outras datas.
+- Carregamentos protegidos contra respostas atrasadas e controles desabilitados durante gravação/exclusão. Horários nativos atualizam imediatamente a duração exibida.
+- Validação: 260 testes backend aprovados, 2 ignorados; TypeScript e build aprovados. Noite fictícia de 9h salva e reaberta, mantendo 8h em hoje; layout conferido em 320 e 390 px.
+
+## Exercícios em datas anteriores — 31/08/2026
+
+- Campo Data da atividade abre em hoje e permite escolher dias anteriores, inclusive outras semanas; atalho Hoje retorna à semana atual.
+- Calendário carrega a semana inteira selecionada, preservando todas as atividades de cada dia. Datas futuras permanecem bloqueadas.
+- Adicionar, editar ou excluir uma atividade antiga atualiza o histórico e o relatório correspondente, sem substituir os exercícios de hoje nem disparar sua celebração.
+- Precisão dos segundos e estimativa de calorias mantidas. O painel recebe sempre o resumo da semana atual, separado da semana consultada.
+- Validação: 250 testes backend aprovados, 2 ignorados; 18 testes de duração/celebrações aprovados; TypeScript e build aprovados. Cadastro, edição e retorno para hoje conferidos em banco fictício, com layout de 320 e 390 px.
+
+## Meu copo ou garrafa — 31/08/2026
+
+- Ao tocar no total de água, a opção Meu copo ou garrafa permite salvar um tamanho entre 50 e 2.000 ml, incluindo 750 e 900 ml.
+- Salvar tamanho não registra consumo nem altera a meta diária. O + passa a usar a preferência, inclusive depois de recarregar; a legenda mostra o tamanho escolhido.
+- Registrar uma quantidade avulsa não muda a preferência. O − desfaz o último registro inteiro.
+- Preferência armazenada no perfil, preservada na edição de metas e na limpeza dos registros; migração mantém 250 ml como padrão dos perfis existentes.
+- Backup local do banco realizado antes da migração. Testes: 240 aprovados, 2 ignorados; compilação frontend aprovada e fluxo validado com banco fictício em tela de celular de 320 px.
+
+## Quantidades rápidas de água — 31/08/2026
+
+- Tocar no total do cartão Água abre um diálogo com atalhos 250, 500 e 750 ml e campo de quantidade personalizada (50–2.000 ml inteiros, limites já existentes no serviço).
+- O + adiciona o tamanho salvo (250 ml por padrão). O − desfaz o último registro inteiro, inclusive garrafas e quantidades personalizadas.
+- Selecionar uma opção não grava: há confirmação Adicionar, Cancelar e fechar. Janela mantém foco e evita fechar durante envio; trava de requisição impede envios concorrentes pelo cartão.
+- Mesma rotina atualiza total, último registro, semana e celebração da meta. Não muda meta nem a quantidade padrão do +.
+- Validação: 8 testes de quantidade/desfazer passaram, TypeScript/build. Prévia isolada em 390/320 px, cancelar, 750 ml, desfazer e 375 ml personalizado. Registros pessoais preservados.
+
+## Gráfico de evolução do peso — 31/08/2026
+
+- Seção Sua trajetória dentro de Peso, entre o resumo e o histórico recente; filtros 30 dias, 90 dias e Tudo.
+- Endpoint próprio consulta somente pesagens reais do perfil ativo, em ordem cronológica, sem limite de 12 itens e sem pontos futuros ou peso inicial artificial.
+- Escala horizontal respeita o intervalo entre datas. Linhas conectam pesagens reais, sem criar estimativas nos dias vazios; zero ou um registro têm estados próprios.
+- Meta atual válida de perda/ganho aparece como linha tracejada neutra. Eixo vertical inclui meta e medições, com escala explicitada.
+- Toque no gráfico escolhe ponto mais próximo; setas e controle deslizante permitem consultar todos os pontos com teclado ou toque. Data e valor aparecem acima do gráfico.
+- Recarrega ao corrigir/excluir peso e ao trocar de período; requisições canceladas não substituem a seleção mais recente. Estados de erro e tentar novamente.
+- Validação: 217 testes backend passaram (2 ignorados por condição de data), 45 frontend, TypeScript/build. Prévia fictícia verificada em 390/320 px, filtros e seleção por toque/setas. Nenhuma pesagem pessoal alterada.
+
+## Registrar peso de outro dia — 31/08/2026
+
+- Campo Data da pesagem abre com Hoje e aceita dias anteriores; data local no navegador, validação ISO e bloqueio de futuro também no servidor.
+- POST cria apenas uma pesagem por data/perfil. Conflitos retornam a pesagem existente sem sobrescrever e oferecem edição explícita por ID, inclusive para datas fora do histórico recente.
+- Edição mantém data/horário original. Registros antigos atualizam histórico e relatório da semana correta sem disparar conquista de hoje ou substituir a categoria de último registro de hoje.
+- Validado com 209 testes backend passando (2 ignorados por condição de data), TypeScript/build e prévia isolada: ontem no histórico, Hoje ao reabrir, aviso de duplicidade e layout 390/320 px.
+
+## Editar e excluir pesagens — 31/08/2026
+
+- Histórico recente permite tocar em cada pesagem real para revelar Editar/Excluir. Mostra os até 12 itens já retornados pelo resumo, antes limitados a cinco na interface.
+- Correção mantém ID, data e horário original; exclusão exige confirmação e preserva outras pesagens, perfil e metas. Peso inicial do perfil é identificado e não tem ações destrutivas.
+- APIs PUT/DELETE por ID são restritas ao perfil ativo, validam valores e não criam registros ausentes. Excluir exige confirmação também no servidor.
+- Painel atualiza resumo e último registro após correções, sem disparar medalhas/troféus de progresso; relatório usa os valores corrigidos ao abrir.
+- Validação: 191 testes backend passaram, 2 ignorados por condição de data; TypeScript/build e fluxo de editar, cancelar e confirmar exclusão em celular 390/320 px, sem transbordamento. Somente pesagens fictícias foram alteradas nos testes.
+
+## Limpar registros e recomeçar — 31/08/2026
+
+- Em Perfil e metas → Seus dados, a opção mostra as contagens de água, sono, exercícios, pesagens e desafios de todo o histórico do perfil ativo.
+- Preserva integralmente perfil, metas e peso inicial do cadastro. Não apaga registros de outros perfis.
+- Backup JSON opcional inclui registros completos, perfil, metas e versão do formato; não existe restauração automática nesta versão.
+- Limpeza exige aviso marcado + texto APAGAR; servidor também exige confirmação, cabeçalho próprio e revisão dos dados. Mudanças depois da prévia impedem apagar até nova revisão.
+- Exclusões são atômicas: qualquer falha desfaz a transação inteira. Não há exclusão ao abrir, baixar backup ou cancelar.
+- Sucesso recarrega o painel ao voltar para evitar estatísticas antigas. Testado somente com bancos fictícios; os registros pessoais não foram apagados durante a implementação.
+- Validação: 175 testes backend passaram, 2 ignorados por condição de data; TypeScript/build e fluxo móvel de cancelar, baixar backup e confirmar em 390/320 px.
+
+## Relatório — comparação entre semanas — 31/08/2026
+
+- Cada cartão mostra uma comparação discreta com a semana anterior, mantendo a cor da área e sem classificar menos registros como fracasso.
+- Semana atual compara segunda até hoje com os mesmos dias da anterior; semanas encerradas comparam os sete dias completos. Período comparado aparece uma vez acima dos cartões.
+- Água e sono comparam dias/noites com meta atingida; exercício compara dias ativos distintos, não número de atividades. As duas semanas usam as metas atuais do perfil.
+- Peso compara a última pesagem real de cada período e mostra ambas as datas e a diferença; não usa o peso do perfil para preencher semanas vazias. Indica direção do objetivo apenas para perda/ganho explícito e não ambíguo.
+- Sem registros em qualquer um dos períodos, ou sem meta configurada de água/sono, não inventa diferença: mostra “Ainda sem comparação”.
+- Indicadores diários de exercício mostram check permanente quando há atividade, com detalhes preservados ao clicar.
+- Validação: 161 testes backend passaram (2 ignorados por condição de data), 42 frontend, TypeScript e build. Conferência de interface em 390 e 320 px sem transbordamento.
+
+## Relatório — destaque baseado em conquistas — 31/08/2026
+
+- “Seu destaque foi…” prioriza o plano semanal de exercício cumprido, usando os dias planejados e registrados. Se houver mais dias que o planejado, mostra ambos sem inventar uma nova meta.
+- Sem plano semanal cumprido, destaca a área com mais dias de meta alcançada entre água e sono; empate menciona as duas. Considera apenas metas configuradas e diferencia dias registrados de dias com meta atingida.
+- Sem essas conquistas, preserva o incentivo pela constância de registros, incluindo peso, sem julgar variações de peso ou cobrar resultados. Semanas vazias atuais e anteriores mantêm mensagens próprias.
+- Mesma aparência e mesmos dados do relatório; sem alteração de registros ou fórmulas. TypeScript, build e 39 testes da interface passaram, incluindo prioridade, empates, singular/plural, metas ausentes e semanas anteriores.
+
+## Relatório — exercícios por dia — 31/08/2026
+
+- Cartão de Exercício mantém os totais semanais e por modalidade, com uma faixa de segunda a domingo. Cada dia mostra a quantidade de atividades; futuros ficam desabilitados e dias sem registros têm mensagem própria.
+- Ao tocar, abre somente os registros do dia escolhido. Atividades da mesma modalidade permanecem separadas e ordenadas pelos registros; não inventa rótulos de ida/volta. Distância, ritmo, velocidade média, tempo com segundos e calorias aparecem somente quando aplicáveis a cada atividade, respeitando valores informados/estimados.
+- Consulta apenas: sem novos controles de editar/excluir ou alterações nos dados. Tocar novamente no dia ou no botão de recolher fecha a lista; o foco retorna ao dia. Trocar de semana reinicia a seleção. Funciona para semanas anteriores e vazias.
+- Validação: TypeScript e build passaram; 151 testes do servidor passaram e dois existentes foram ignorados por ser segunda-feira. Navegador em 390/320 pixels com três atividades no domingo, corrida no sábado (3,28 km, 29min 49s, 9:05 /km), dia vazio, recolhimento, foco e troca de semana. Sem rolagem lateral ou alteração de registros pessoais.
+
+## Relatório — navegação semanal e cabeçalho compacto — 31/08/2026
+
+- Setas para consultar semanas anteriores e avançar até a atual, com botão “Voltar à atual”. Período inclui o ano e lida com semanas entre meses/anos. Ao reabrir o relatório, retorna à semana atual. Dias selecionados são reiniciados ao trocar de período.
+- Consulta somente leitura com `weekOffset`: semanas passadas incluem segunda a domingo; a atual considera apenas os dias decorridos. Não permite semanas futuras e valida entradas inválidas. Nenhuma alteração no histórico pessoal ou migração de banco.
+- Semana antiga sem pesagem mostra “Sem registros”, sem apresentar o peso atual como dado histórico. Textos diferenciam semana encerrada, ausência de dados e semana em andamento. Metas históricas usam as configurações atuais do perfil, com aviso no relatório.
+- Cabeçalho móvel mais compacto: título e círculo lado a lado, resumo abaixo e textos auxiliares mais legíveis. Mantidos cores, identidade, detalhes e estrutura de duas colunas no computador.
+- Validação: TypeScript, build, 149 testes de servidor passaram; dois testes existentes são ignorados às segundas-feiras. Navegador com dados fictícios: consulta anterior, domingo, semana vazia, próxima semana, retorno à atual, reabertura, larguras 320/390 e layout desktop. Endpoint atualizado respondendo na página local.
+- Comparação com a semana anterior implementada em 31/08/2026. Compartilhamento permanece adiado.
+
 ## Peso — medalha e troféu aprovados — 28/08/2026
 
 - Aplicados os dois símbolos da prévia: medalha dourada com fita verde e folha em relevo para o progresso; troféu com a folha como escultura dourada sobre base verde para a meta. Componente vetorial compartilhado, com identificadores de degradê únicos por instância.

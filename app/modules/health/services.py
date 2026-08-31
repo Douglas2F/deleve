@@ -30,7 +30,7 @@ def create_profile(data: dict) -> int:
 def get_latest_profile() -> dict | None:
     database = get_database()
     row = database.execute(
-        "SELECT id, name, height_cm, current_weight_kg, goal, sleep_goal_hours, water_goal_ml FROM health_profiles ORDER BY id DESC LIMIT 1"
+        "SELECT id, name, height_cm, current_weight_kg, goal, sleep_goal_hours, water_goal_ml, water_portion_ml FROM health_profiles ORDER BY id DESC LIMIT 1"
     ).fetchone()
     if row is None:
         return None
@@ -43,6 +43,7 @@ def get_latest_profile() -> dict | None:
         "name": row["name"], "heightCm": row["height_cm"],
         "weightKg": row["current_weight_kg"], "goal": row["goal"], "goals": [item.strip() for item in row["goal"].split(",")],
         "sleepGoalHours": row["sleep_goal_hours"], "waterGoalMl": row["water_goal_ml"],
+        "waterPortionMl": row["water_portion_ml"],
         "exerciseDaysWeek": targets.get("Praticar atividade física") or 0,
         "targetWeightKg": targets.get("Perder peso") or targets.get("Ganhar peso") or "",
     }

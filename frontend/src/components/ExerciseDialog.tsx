@@ -42,6 +42,7 @@ export default function ExerciseDialog({open,onClose,onChanged}:ExerciseDialogPr
  const [loading,setLoading]=useState(false);
  const [notice,setNotice]=useState("");
  const formHeading=useRef<HTMLHeadingElement>(null);
+ const dateRequest=useRef(0);
  const today=getLocalToday();
 
  useEffect(()=>{
@@ -53,7 +54,7 @@ export default function ExerciseDialog({open,onClose,onChanged}:ExerciseDialogPr
    .then((body:ExerciseWeek)=>{if(controller.signal.aborted)return;setWeek(body);const selected=body.days.find(day=>day.isToday);if(selected)selectDay(selected)})
    .catch(()=>{if(!controller.signal.aborted)setWeekError("Não foi possível carregar esta semana. Feche e tente novamente.");})
    .finally(()=>{if(!controller.signal.aborted)setLoading(false)});
-  return ()=>controller.abort();
+  return ()=>{controller.abort();dateRequest.current++};
  },[open]);
 
  useEffect(()=>{
@@ -99,10 +100,33 @@ export default function ExerciseDialog({open,onClose,onChanged}:ExerciseDialogPr
   setSelectedDate(day.date);fillForm();setFormOpen(!day.hasExercise);setNotice("");
  }
 
- async function refreshWeek(saved:ExerciseSaveContext){
-  const response=await fetch("/api/health/exercise/week");
-  if(!response.ok)throw new Error("A atividade foi salva, mas o resumo não carregou. Feche e abra novamente.");
-  const body=await response.json() as ExerciseWeek;setWeek(body);onChanged(body,saved);
+ async function readWeek(value?:string):Promise<ExerciseWeek>{
+  const response=await fetch(`/api/health/exercise/week${value?`?date=${encodeURIComponent(value)}`:""}`);
+  if(!response.ok)throw new Error("Não foi possível carregar as atividades. Tente selecionar a data novamente.");
+  return response.json();
+ }
+
+ async function chooseDate(value:string){
+  if(saving||deleting||loading)return;
+  if(!value||value>today){setError("Escolha hoje ou uma data anterior.");return}
+  const existing=week?.days.find(day=>day.date===value);
+  if(existing){selectDay(existing);return}
+  const requestId=++dateRequest.current;
+  setSelectedDate(value);setLoading(true);setWeek(null);setFormOpen(false);setDeleteTarget(null);setError("");setWeekError("");setNotice("");
+  try{
+   const body=await readWeek(value);
+   if(requestId!==dateRequest.current)return;
+   setWeek(body);
+   const day=body.days.find(day=>day.date===value);
+   if(day)selectDay(day);
+  }catch(caught){if(requestId===dateRequest.current)setWeekError(caught instanceof Error?caught.message:"Não foi possível carregar as atividades.")}
+  finally{if(requestId===dateRequest.current)setLoading(false)}
+ }
+
+ async function refreshWeek(saved?:ExerciseSaveContext){
+  const [selectedWeek,currentWeek]=await Promise.all([readWeek(selectedDate),readWeek()]);
+  setWeek(selectedWeek);onChanged(currentWeek,saved);
+  return selectedWeek;
  }
 
  async function save(event:FormEvent){
@@ -132,8 +156,9 @@ export default function ExerciseDialog({open,onClose,onChanged}:ExerciseDialogPr
    const response=await fetch(`/api/health/exercise/${deleteTarget.id}`,{method:"DELETE"});
    const body=await response.json().catch(()=>({})) as {week?:ExerciseWeek;error?:string};
    if(!response.ok||!body.week)throw new Error(body.error??"Não foi possível excluir a atividade.");
-   setWeek(body.week);onChanged(body.week);setDeleteTarget(null);
-   const remaining=body.week.days.find(day=>day.date===selectedDate);
+   setDeleteTarget(null);
+   const refreshed=await refreshWeek();
+   const remaining=refreshed.days.find(day=>day.date===selectedDate);
    if(!remaining?.hasExercise)fillForm();
    else if(editingId===deleteTarget.id){setFormOpen(false);setEditingId(null)}
    setNotice("Atividade excluída. Os outros registros foram mantidos.");
@@ -149,6 +174,7 @@ export default function ExerciseDialog({open,onClose,onChanged}:ExerciseDialogPr
  return <div className="health-dialog-overlay fixed inset-0 z-50 bg-stone-950/45 p-0 backdrop-blur-sm sm:p-5">
   <section role="dialog" aria-modal="true" aria-labelledby="exercise-dialog-title" className="health-dialog-panel w-full max-w-lg rounded-t-[2rem] bg-white p-6 shadow-2xl sm:rounded-[2rem] sm:p-7">
    <header className="flex items-start justify-between gap-4"><div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-2xl bg-rose-100 text-rose-700"><Activity size={21}/></span><div><p className="text-xs font-semibold text-rose-600">{selectedDate&&selectedDate!==today?`Registro de ${formatSelectedDate(selectedDate)}`:"Movimento de hoje"}</p><h2 id="exercise-dialog-title" className="text-xl font-bold">O que você fez?</h2></div></div><button type="button" disabled={saving||deleting} onClick={onClose} aria-label="Fechar registro de exercício" className="grid size-10 place-items-center rounded-xl bg-stone-100 text-stone-600 outline-none focus-visible:ring-4 focus-visible:ring-rose-200"><X size={19}/></button></header>
+   <div className="mt-5 flex items-end gap-2"><label className="min-w-0 flex-1 text-xs font-semibold text-stone-600">Data da atividade<input type="date" max={today} value={selectedDate} disabled={saving||deleting||loading} onInput={event=>void chooseDate(event.currentTarget.value)} className="mt-2 block min-h-11 w-full min-w-0 rounded-xl border border-stone-200 bg-stone-50 px-3 text-base text-stone-900 outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-100"/></label>{selectedDate!==today&&<button type="button" disabled={saving||deleting||loading} onClick={()=>void chooseDate(today)} className="min-h-11 rounded-xl bg-rose-50 px-3 text-sm font-bold text-rose-700">Hoje</button>}</div>
    {loading&&<p role="status" className="mt-5 text-sm text-stone-500">Carregando atividades…</p>}
    {week&&<WeekCalendar week={week} selectedDate={selectedDate} onSelect={selectDay} disabled={saving||deleting}/>}
    {notice&&<p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
@@ -199,7 +225,7 @@ function WeekCalendar({week,selectedDate,onSelect,disabled}:{week:ExerciseWeek;s
  const daysText=week.targetDays?`${week.completedDays} de ${week.targetDays} dias`:`${week.completedDays} dia${week.completedDays===1?"":"s"}`;
  const today=getLocalToday();
  return <section aria-label="Atividades desta semana" className="mt-5 rounded-2xl bg-rose-50/70 p-4">
-  <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-bold text-stone-800">Esta semana</h3><span className="text-right text-xs font-semibold text-rose-700">{daysText} · {formatExerciseDuration(exerciseSeconds(week.totalSeconds,week.totalMinutes))}</span></div>
+  <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-bold text-stone-800">{week.days.some(day=>day.isToday)?"Esta semana":`${formatCalendarDate(week.startDate!)} – ${formatCalendarDate(week.endDate!)}`}</h3><span className="text-right text-xs font-semibold text-rose-700">{daysText} · {formatExerciseDuration(exerciseSeconds(week.totalSeconds,week.totalMinutes))}</span></div>
   <div className="mt-3 grid grid-cols-7 gap-1">{week.days.map((day,index)=>{const future=day.date>today;return <button key={day.date} type="button" disabled={future||disabled} onClick={()=>onSelect(day)} aria-label={`${dayLabels[index]} ${formatCalendarDate(day.date)}${day.hasExercise?", exercício registrado":""}${day.isToday?", hoje":""}${future?", indisponível":""}`} aria-pressed={selectedDate===day.date} className={`flex min-h-12 flex-col items-center justify-center rounded-xl text-[10px] font-bold outline-none transition focus-visible:ring-4 focus-visible:ring-rose-200 disabled:cursor-not-allowed disabled:opacity-40 ${selectedDate===day.date?"ring-2 ring-rose-400":day.isToday?"ring-2 ring-rose-300":""} ${day.hasExercise?"bg-rose-600 text-white":"bg-white/70 text-stone-500"}`}><span>{dayLabels[index]}</span><span className="mt-1 grid h-4 place-items-center">{day.hasExercise?<Check size={14} strokeWidth={3}/>:new Date(`${day.date}T12:00:00`).getDate()}</span></button>})}</div>
   <div aria-label="Registro do dia selecionado" className="mt-3 rounded-xl bg-white p-3 text-xs">
    <p className="text-[10px] font-semibold text-stone-500">{selectedDate?`Registro de ${formatCalendarDate(selectedDate)}`:"Selecione um dia"}</p>

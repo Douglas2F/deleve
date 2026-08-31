@@ -1,0 +1,27 @@
+.reset-records-settings { margin-top: 28px; padding-top: 22px; border-top: 1px solid #e7e5e4; }
+.reset-records-settings h3 { font-size: 14px; font-weight: 700; }
+.reset-records-settings > p { margin: 6px 0 12px; font-size: 12px; color: #57534e; }
+.reset-records-settings > button { display: flex; align-items: center; gap: 8px; min-height: 44px; text-align: left; color: #9f1239; font-size: 13px; font-weight: 600; }
+.reset-records-dialog { margin: auto; width: min(480px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 24px; border: 1px solid #e7e5e4; border-radius: 24px; background: white; color: #292524; box-shadow: 0 24px 80px #0003; }
+.reset-records-dialog::backdrop { background: #1c191799; backdrop-filter: blur(3px); }
+.reset-records-dialog header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.reset-records-dialog h2 { font-size: 20px; font-weight: 700; line-height: 1.3; }
+.reset-records-dialog header button { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; margin-top: -8px; }
+.reset-records-dialog p { font-size: 13px; line-height: 1.6; margin-top: 14px; overflow-wrap: anywhere; }
+.reset-records-counts { margin: 18px 0; padding: 8px 14px; background: #fafaf9; border-radius: 16px; }
+.reset-records-counts > div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 13px; }
+.reset-records-counts dd { font-weight: 700; font-variant-numeric: tabular-nums; }
+.reset-records-dialog button { min-height: 44px; cursor: pointer; }
+.reset-records-dialog button:disabled, .reset-records-settings button:disabled { opacity: .45; cursor: default; }
+.reset-records-dialog button:focus-visible, .reset-records-settings button:focus-visible { outline: 3px solid #0d9488; outline-offset: 3px; }
+.reset-records-backup { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 18px; padding: 10px; border: 1px solid #d6d3d1; border-radius: 12px; font-size: 13px; font-weight: 600; }
+.reset-records-dialog .reset-records-hint { font-size: 11px; color: #57534e; margin-top: 8px; }
+.reset-records-ack { display: flex; align-items: flex-start; gap: 10px; margin-top: 22px; font-size: 13px; line-height: 1.5; }
+.reset-records-ack input { width: 20px; height: 20px; flex-shrink: 0; accent-color: #be123c; }
+.reset-records-confirm { display: block; font-size: 13px; margin-top: 18px; }
+.reset-records-confirm input { display: block; margin-top: 8px; width: 100%; height: 48px; padding: 12px; border: 1px solid #d6d3d1; border-radius: 12px; font-size: 16px; }
+.reset-records-dialog footer { display: flex; gap: 10px; margin-top: 22px; }
+.reset-records-dialog footer button { flex: 1; padding: 10px; border-radius: 12px; background: #f5f5f4; font-size: 13px; font-weight: 600; }
+.reset-records-dialog footer .reset-records-delete { background: #be123c; color: white; }
+.reset-records-dialog .reset-records-error { padding: 12px; border-radius: 12px; background: #fff1f2; color: #9f1239; }
+.reset-records-return { width: 100%; margin-top: 22px; padding: 12px; border-radius: 12px; background: #047857; color: white; font-weight: 600; }

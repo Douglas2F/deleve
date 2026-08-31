@@ -248,6 +248,13 @@ def preview_exercise_calories(data: dict) -> dict:
     return {"estimate": _estimate_for_profile(profile["id"], kind, duration, distance, selected_date, existing, effort)}
 
 
+def get_exercise_week_for_date(value: str | None = None) -> dict:
+    """Returns the whole selected week, capped at today, for the activity calendar."""
+    selected = _parse_exercise_date(value)
+    end = selected + timedelta(days=6 - selected.weekday())
+    return get_weekly_exercise_summary(min(end, date.today()))
+
+
 def get_weekly_exercise_summary(reference_date: date | None = None) -> dict:
     database = get_database()
     current_date = reference_date or date.today()
@@ -273,7 +280,7 @@ def get_weekly_exercise_summary(reference_date: date | None = None) -> dict:
         single = day_entries[0] if len(day_entries) == 1 else None
         summary = summarize_exercises(day_entries)
         days.append({
-            "date": day.isoformat(), "isToday": day == current_date,
+            "date": day.isoformat(), "isToday": day == date.today(),
             "hasExercise": bool(day_entries), "entries": day_entries, **summary,
             # Compatibility fields are meaningful only for a single activity.
             "type": single["type"] if single else None,
@@ -333,11 +340,8 @@ def _parse_exercise_date(value: str | None) -> date:
             raise ValueError("Informe uma data de exercício válida.") from error
 
     today = date.today()
-    week_start = today - timedelta(days=today.weekday())
     if selected_date > today:
         raise ValueError("Não é possível registrar exercício em uma data futura.")
-    if selected_date < week_start:
-        raise ValueError("Nesta tela, registre apenas os dias da semana atual.")
     return selected_date
 
 
