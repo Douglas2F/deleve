@@ -1,7 +1,8 @@
 import { ArrowLeft, ArrowRight, Check, HeartPulse } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import Brand from "./components/Brand";
-import Dashboard, { HealthProfile } from "./components/Dashboard";
+import Dashboard, { HealthProfile, type HealthShortcut, type HomeFeedback } from "./components/Dashboard";
+import HomeDashboard from "./components/HomeDashboard";
 import LandingPage from "./components/LandingPage";
 
 type Data = {name:string;heightCm:string;weightKg:string;goal:string;goals:string[];targetWeightKg:string;sleepGoalHours:string;waterGoalMl:string;exerciseDaysWeek:string};
@@ -10,6 +11,9 @@ const start:Data={name:"",heightCm:"",weightKg:"",goal:"",goals:[],targetWeightK
 export default function App(){
  const [step,setStep]=useState(0),[data,setData]=useState(start),[error,setError]=useState(""),[saving,setSaving]=useState(false);
  const [profile,setProfile]=useState<HealthProfile|null>(null);
+ const [activeArea,setActiveArea]=useState<"home"|"health">("home");
+ const [healthShortcut,setHealthShortcut]=useState<HealthShortcut>("overview");
+ const [homeFeedback,setHomeFeedback]=useState<HomeFeedback|null>(null);
  useEffect(()=>{fetch("/api/health/profile").then(r=>r.ok?r.json():null).then(p=>{if(p){setProfile(p);setStep(5)}}).catch(()=>undefined)},[]);
  const change=(key:keyof Data)=>(value:string)=>setData({...data,[key]:value});
  const toggleGoal=(goal:string)=>{const weight=["Perder peso","Ganhar peso","Manter peso"];let goals=data.goals.includes(goal)?data.goals.filter(x=>x!==goal):[...data.goals,goal];if(weight.includes(goal)&&!data.goals.includes(goal))goals=goals.filter(x=>!weight.includes(x)||x===goal);setData({...data,goals,goal:goals.join(", ")})};
@@ -26,7 +30,11 @@ export default function App(){
    setError(message);
   }finally{setSaving(false)}
  }
- if(step===5&&profile)return <Dashboard profile={profile} onProfileUpdated={setProfile}/>;
+ function openHealth(shortcut:HealthShortcut="overview"){setHealthShortcut(shortcut);setActiveArea("health")}
+ function backHome(feedback?:HomeFeedback){setActiveArea("home");setHealthShortcut("overview");setHomeFeedback(feedback??null)}
+ if(step===5&&profile)return activeArea==="health"
+  ?<Dashboard profile={profile} onProfileUpdated={setProfile} onBackHome={backHome} initialShortcut={healthShortcut}/>
+  :<HomeDashboard profile={profile} onOpenHealth={openHealth} feedback={homeFeedback} onFeedbackDone={()=>setHomeFeedback(null)}/>;
  if(step===0)return <LandingPage onStart={()=>setStep(1)}/>;
  return <main className="relative min-h-screen overflow-x-hidden bg-stone-50 text-stone-900 before:pointer-events-none before:absolute before:-right-40 before:-top-48 before:size-[32rem] before:rounded-full before:bg-gradient-to-br before:from-emerald-200/50 before:via-teal-100/30 before:to-transparent before:blur-3xl after:pointer-events-none after:absolute after:-bottom-48 after:-left-40 after:size-[30rem] after:rounded-full after:bg-gradient-to-tr after:from-cyan-100/45 after:via-emerald-50/20 after:to-transparent after:blur-3xl"><section className="relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col px-6 py-7 md:px-12">
   <nav className="flex items-center justify-between"><Brand/>{step>0&&step<4&&<small>Etapa {step} de 3</small>}</nav>

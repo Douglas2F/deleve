@@ -1,6 +1,6 @@
 import DeleveSymbol from "./DeleveSymbol";
 import { exerciseSeconds, formatExerciseDuration } from "./exerciseDuration";
-import { Activity, CalendarDays, Check, ChevronRight, Droplets, Flame, Gauge, Minus, MoonStar, Pause, Play, Plus, Route, Scale, Sun, Target, Timer, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, CalendarDays, Check, ChevronRight, Droplets, Flame, Gauge, Home, Minus, MoonStar, Pause, Play, Plus, Route, Scale, Sun, Target, Timer, TrendingDown, TrendingUp } from "lucide-react";
 import { calorieLabel, calorieSuffix } from "./calorieLabels";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ExerciseDialog, { ExerciseEntry, ExerciseWeek, ExerciseWeekDay } from "./ExerciseDialog";
@@ -22,39 +22,41 @@ import WeightAward from "./WeightAward";
 import { sleepMilestone, exerciseMilestone, weightRewardKind, weightChangeKg, isWeightGoalReached, type ExerciseSaveContext } from "./healthMilestones";
 
 export type HealthProfile={waterPortionMl?:number;name:string;heightCm:string;weightKg:string;goal:string;goals:string[];sleepGoalHours:string;waterGoalMl:string;exerciseDaysWeek:string;targetWeightKg:string};
+export type HealthShortcut="overview"|"water"|"sleep"|"exercise"|"weight"|"challenge"|"profile";
+export type HomeFeedback={kind:"water"|"sleep"|"exercise"|"weight"|"challenge";message:string;id:number};
 
 type WaterResponse={totalMl:number;error?:string};
 type LatestKind="water"|"sleep"|"exercise"|"weight";
 
-export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProfile;onProfileUpdated:(profile:HealthProfile)=>void}){
+export default function Dashboard({profile,onProfileUpdated,onBackHome,initialShortcut="overview"}:{profile:HealthProfile;onProfileUpdated:(profile:HealthProfile)=>void;onBackHome:(feedback?:HomeFeedback)=>void;initialShortcut?:HealthShortcut}){
  const firstName=profile.name.trim().split(" ")[0];
  const waterGoal=Math.max(Number(profile.waterGoalMl)||2000,1);
  const waterPortion=profile.waterPortionMl??250;
  const [waterTotal,setWaterTotal]=useState(0);
  const [waterError,setWaterError]=useState("");
  const [savingWater,setSavingWater]=useState(false);
- const [waterAmountOpen,setWaterAmountOpen]=useState(false);
+ const [waterAmountOpen,setWaterAmountOpen]=useState(initialShortcut==="water");
  const waterRequest=useRef(false);
  const [waterMotionPaused,setWaterMotionPaused]=useState(false);
  const [waterCelebrating,setWaterCelebrating]=useState(false);
  const [sleepEntry,setSleepEntry]=useState<SleepEntry|null>(null);
- const [sleepDialogOpen,setSleepDialogOpen]=useState(false);
+ const [sleepDialogOpen,setSleepDialogOpen]=useState(initialShortcut==="sleep");
  const [sleepWeek,setSleepWeek]=useState<SleepWeek|null>(null);
  const [exerciseEntry,setExerciseEntry]=useState<ExerciseEntry|null>(null);
- const [exerciseDialogOpen,setExerciseDialogOpen]=useState(false);
+ const [exerciseDialogOpen,setExerciseDialogOpen]=useState(initialShortcut==="exercise");
  const [exerciseWeek,setExerciseWeek]=useState<ExerciseWeek|null>(null);
  const exerciseDay=exerciseWeek?.days.find(day=>day.isToday);
  const [weightSummary,setWeightSummary]=useState<WeightSummary|null>(null);
  const weightGoals=profile.goals??profile.goal.split(",").map(goal=>goal.trim());
  const weightTarget=profile.targetWeightKg?Number(profile.targetWeightKg):undefined;
  const weightGoalReached=weightSummary!==null&&isWeightGoalReached(weightSummary.currentWeightKg,weightGoals,weightTarget);
- const [weightDialogOpen,setWeightDialogOpen]=useState(false);
+ const [weightDialogOpen,setWeightDialogOpen]=useState(initialShortcut==="weight");
  const [weeklyReportOpen,setWeeklyReportOpen]=useState(false);
  const [waterWeek,setWaterWeek]=useState<WaterWeek|null>(null);
  const [waterWeekOpen,setWaterWeekOpen]=useState(false);
  const [latestKind,setLatestKind]=useState<LatestKind>(()=>(localStorage.getItem("deleve-latest-health") as LatestKind)||"water");
  const [latestAt,setLatestAt]=useState("");
- const [profileOpen,setProfileOpen]=useState(false);
+ const [profileOpen,setProfileOpen]=useState(initialShortcut==="profile");
  const [weightCelebration,setWeightCelebration]=useState<WeightCelebrationEvent|null>(null);
  const finishWeightCelebration=useCallback(()=>setWeightCelebration(null),[]);
  const [exerciseCelebrationId,setExerciseCelebrationId]=useState<number|null>(null);
@@ -65,6 +67,11 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
  const waterGoalReached=isWaterGoalReached(waterTotal,waterGoal);
  const completedRecords=(waterTotal>0?1:0)+(sleepEntry?1:0)+(exerciseEntry?1:0);
  function markLatest(kind:LatestKind){setLatestKind(kind);setLatestAt(new Date().toISOString());localStorage.setItem("deleve-latest-health",kind)}
+ function returnHomeFrom(shortcut:HomeFeedback["kind"]){
+  if(initialShortcut!==shortcut)return;
+  const messages={water:"Água adicionada",sleep:"Sono registrado",exercise:"Exercício registrado",weight:"Peso registrado",challenge:"Desafio salvo"};
+  window.setTimeout(()=>onBackHome({kind:shortcut,message:messages[shortcut],id:Date.now()}),0);
+ }
 
  function updateRecordedSleep(entry:SleepEntry){
   const goalMinutes=Number(profile.sleepGoalHours)*60;
@@ -238,9 +245,9 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
  }
 
  return <main className="min-h-screen bg-[#f6f8f6] text-stone-900"><section className="mx-auto min-h-screen max-w-5xl px-5 pb-28 pt-7 md:px-10">
-  <header className="flex items-center justify-between"><div><p className="text-sm text-stone-500">Olá, {firstName}</p><h1 className="text-2xl font-semibold tracking-tight">Seu dia, de leve.</h1></div><button onClick={()=>setProfileOpen(true)} aria-label="Abrir perfil e metas" className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-700 to-cyan-500 font-bold text-white shadow-lg shadow-emerald-900/10 outline-none transition hover:scale-105 focus-visible:ring-4 focus-visible:ring-emerald-200">{firstName.charAt(0).toUpperCase()}</button></header>
+  <header className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><button type="button" onClick={()=>onBackHome()} aria-label="Voltar para o início" className="grid size-11 shrink-0 place-items-center rounded-2xl bg-white text-emerald-800 shadow-sm ring-1 ring-stone-200 outline-none transition hover:bg-emerald-50 focus-visible:ring-4 focus-visible:ring-emerald-200"><Home size={19} aria-hidden="true"/></button><div className="min-w-0"><p className="text-sm text-stone-500">Olá, {firstName}</p><h1 className="truncate text-2xl font-semibold tracking-tight">Seu dia, de leve.</h1></div></div><button onClick={()=>setProfileOpen(true)} aria-label="Abrir perfil e metas" className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-700 to-cyan-500 font-bold text-white shadow-lg shadow-emerald-900/10 outline-none transition hover:scale-105 focus-visible:ring-4 focus-visible:ring-emerald-200">{firstName.charAt(0).toUpperCase()}</button></header>
   <div className="mt-8 flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-emerald-700">Saúde — Hoje</p><h2 className="mt-1 text-3xl font-semibold tracking-[-.04em]">Um passo de cada vez.</h2></div><span className="hidden text-sm text-stone-400 md:block">{profile.goal}</span></div>
-  <FocusOfDay/>
+  <FocusOfDay openEditorWhenEmpty={initialShortcut==="challenge"} onSaved={()=>returnHomeFrom("challenge")} onCancel={initialShortcut==="challenge"?()=>returnHomeFrom("challenge"):undefined}/>
   <LatestRecord kind={latestKind} recordedAt={latestAt} waterTotal={waterTotal} waterGoal={waterGoal} waterWeek={waterWeek} weightSummary={weightSummary} sleepEntry={sleepEntry} exerciseEntry={exerciseEntry} exerciseCount={exerciseDay?.activityCount??(exerciseEntry?1:0)} weight={weightSummary?.currentWeightKg??Number(profile.weightKg)} onOpen={()=>latestKind==="water"?setWaterWeekOpen(true):latestKind==="sleep"?setSleepDialogOpen(true):latestKind==="exercise"?setExerciseDialogOpen(true):setWeightDialogOpen(true)}/>
   <section className="mt-6 grid gap-4 md:grid-cols-2">
    <article aria-label="Água de hoje" data-celebrating={waterCelebrating} data-goal-reached={waterGoalReached} className="water-card rounded-3xl bg-gradient-to-br from-sky-600 to-cyan-500 p-6 text-white shadow-xl shadow-sky-900/10">
@@ -264,7 +271,7 @@ export default function Dashboard({profile,onProfileUpdated}:{profile:HealthProf
    </div>
   </section>
   <section className="mt-5 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-100"><div className="flex justify-between"><div><p className="text-sm text-stone-500">Progresso de hoje</p><h3 className="mt-1 text-xl font-semibold">{completedRecords?`${completedRecords} registro${completedRecords>1?"s":""} concluído${completedRecords>1?"s":""}`:"Comece com um registro"}</h3></div><span className="text-sm font-semibold text-emerald-700">{completedRecords} de 3</span></div><div className="mt-5 h-2 rounded-full bg-stone-100"><div className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-cyan-500 transition-[width] duration-300" style={{width:`${completedRecords?Math.round((completedRecords/3)*100):4}%`}}/></div><p className="mt-4 text-sm text-stone-500">Sem pressão. Cada pequeno registro já conta.</p><button onClick={()=>setWeeklyReportOpen(true)} className="mt-5 flex min-h-12 w-full items-center justify-between rounded-2xl bg-emerald-50 px-4 text-sm font-bold text-emerald-800 outline-none transition hover:bg-emerald-100 focus-visible:ring-4 focus-visible:ring-emerald-200"><span className="flex items-center gap-2"><CalendarDays size={18}/>Ver relatório semanal</span><ChevronRight size={18}/></button></section>
- </section><WaterAmountDialog open={waterAmountOpen} busy={savingWater} error={waterError} onClose={()=>setWaterAmountOpen(false)} onAdd={addGlass} portion={waterPortion} onSavePortion={saveWaterPortion}/><ProfileDialog open={profileOpen} profile={profile} onClose={()=>setProfileOpen(false)} onSaved={onProfileUpdated}/><SleepDialog open={sleepDialogOpen} onClose={()=>setSleepDialogOpen(false)} onSaved={updateRecordedSleep} onDeletedToday={()=>{setSleepEntry(null);markLatest("water")}} onWeekChanged={setSleepWeek} initialEntry={sleepEntry}/><ExerciseDialog open={exerciseDialogOpen} onClose={()=>setExerciseDialogOpen(false)} onChanged={updateExerciseWeek}/><WeightDialog open={weightDialogOpen} onClose={()=>setWeightDialogOpen(false)} onSaved={updateRecordedWeight} onCorrected={updateCorrectedWeight} summary={weightSummary} fallbackWeight={profile.weightKg}/><WaterWeekDialog open={waterWeekOpen} onClose={()=>setWaterWeekOpen(false)} week={waterWeek} onWeekChanged={setWaterWeek} onTodayChanged={(total,deleted)=>{if(deleted)updateCorrectedWater(total);else{updateRecordedWater(total);markLatest("water")}}}/><WeeklyReport open={weeklyReportOpen} onClose={()=>setWeeklyReportOpen(false)}/></main>
+ </section><WaterAmountDialog open={waterAmountOpen} busy={savingWater} error={waterError} onClose={()=>initialShortcut==="water"?onBackHome():setWaterAmountOpen(false)} onAdd={async amount=>{const saved=await addGlass(amount);if(saved)returnHomeFrom("water");return saved}} portion={waterPortion} onSavePortion={saveWaterPortion}/><ProfileDialog open={profileOpen} profile={profile} onClose={()=>initialShortcut==="profile"?onBackHome():setProfileOpen(false)} onSaved={onProfileUpdated}/><SleepDialog open={sleepDialogOpen} onClose={()=>initialShortcut==="sleep"?onBackHome():setSleepDialogOpen(false)} onSaved={entry=>{updateRecordedSleep(entry);returnHomeFrom("sleep")}} onDeletedToday={()=>{setSleepEntry(null);markLatest("water")}} onWeekChanged={setSleepWeek} initialEntry={sleepEntry}/><ExerciseDialog open={exerciseDialogOpen} onClose={()=>initialShortcut==="exercise"?onBackHome():setExerciseDialogOpen(false)} onChanged={(week,saved)=>{updateExerciseWeek(week,saved);if(saved)returnHomeFrom("exercise")}}/><WeightDialog open={weightDialogOpen} onClose={()=>initialShortcut==="weight"?onBackHome():setWeightDialogOpen(false)} onSaved={summary=>{updateRecordedWeight(summary);returnHomeFrom("weight")}} onCorrected={summary=>{updateCorrectedWeight(summary);returnHomeFrom("weight")}} summary={weightSummary} fallbackWeight={profile.weightKg}/><WaterWeekDialog open={waterWeekOpen} onClose={()=>setWaterWeekOpen(false)} week={waterWeek} onWeekChanged={setWaterWeek} onTodayChanged={(total,deleted)=>{if(deleted)updateCorrectedWater(total);else{updateRecordedWater(total);markLatest("water")}}}/><WeeklyReport open={weeklyReportOpen} onClose={()=>setWeeklyReportOpen(false)}/></main>
 }
 
 function LatestRecord({kind,recordedAt,waterTotal,waterGoal,waterWeek,sleepEntry,exerciseEntry,exerciseCount,weight,weightSummary,onOpen}:{kind:LatestKind;recordedAt:string;waterTotal:number;waterGoal:number;waterWeek:WaterWeek|null;sleepEntry:SleepEntry|null;exerciseEntry:ExerciseEntry|null;exerciseCount:number;weight:number;weightSummary:WeightSummary|null;onOpen:()=>void}){

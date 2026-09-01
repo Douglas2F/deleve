@@ -25,6 +25,34 @@
 .exercise-entry-confirmation{position:relative;z-index:2}
 @media(max-width:359px){.exercise-entry{padding:12px}.exercise-entry-heading{gap:7px}.exercise-entry-symbol{width:28px;height:32px}.exercise-entry-metric{padding:8px}.exercise-entry-actions{top:12px;right:8px}.exercise-entry-hint{top:24px}}
 :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-synthesis:none;text-rendering:optimizeLegibility}*{box-sizing:border-box}body{margin:0;min-width:320px;min-height:100vh;background:#fafaf9}button{cursor:pointer}@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}.animate-rise{animation:rise .65s cubic-bezier(.2,.75,.25,1) both}@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+.home-care-tile[data-tone=water]{--home-care-ring:rgba(14,165,233,.28);--home-care-shadow:rgba(2,132,199,.18);--home-care-rest:rgba(2,132,199,.1)}
+.home-care-tile[data-tone=sleep]{--home-care-ring:rgba(139,92,246,.28);--home-care-shadow:rgba(124,58,237,.18);--home-care-rest:rgba(124,58,237,.1)}
+.home-care-tile[data-tone=exercise]{--home-care-ring:rgba(244,63,94,.26);--home-care-shadow:rgba(225,29,72,.17);--home-care-rest:rgba(225,29,72,.09)}
+.home-care-tile[data-tone=weight]{--home-care-ring:rgba(245,158,11,.28);--home-care-shadow:rgba(217,119,6,.18);--home-care-rest:rgba(217,119,6,.1)}
+@keyframes home-care-glow{0%{box-shadow:0 0 0 0 transparent}35%{box-shadow:0 0 0 3px var(--home-care-ring),0 10px 24px var(--home-care-shadow)}100%{box-shadow:0 7px 18px var(--home-care-rest)}}
+@keyframes home-care-message{0%{opacity:0;transform:translateY(8px)}15%,78%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-3px)}}
+@keyframes home-care-value-hide{0%,100%{opacity:1}12%,82%{opacity:0}}
+.home-care-tile[data-celebrating=true]{animation:home-care-glow 2.4s ease-out both}
+.home-care-tile[data-celebrating=true] .home-care-value{animation:home-care-value-hide 2.4s ease both}
+.home-care-achievement{animation:home-care-message 2.4s ease both}
+@media(prefers-reduced-motion:reduce){.home-care-tile[data-celebrating=true],.home-care-tile[data-celebrating=true] .home-care-value,.home-care-achievement{animation:none}.home-care-achievement{display:none}}
+
+.home-challenge{transition:background-color .35s ease,box-shadow .35s ease}
+.home-challenge[data-completed=true]{background:linear-gradient(90deg,rgba(16,185,129,.13),rgba(34,211,238,.055) 62%,transparent)}
+.home-challenge-line{background:rgba(6,78,59,.12)}
+.home-challenge[data-completed=true] .home-challenge-line{height:2px;background:linear-gradient(90deg,#059669,#22d3ee 58%,rgba(34,211,238,0))}
+.home-challenge[data-completed=true] .home-challenge-text{color:#57534e}
+.home-challenge-strike{transform:scaleX(1)}
+.home-challenge[data-celebrating=true] .home-challenge-strike{animation:home-challenge-strike .8s cubic-bezier(.2,.8,.25,1) .2s both}
+.home-challenge-sweep{z-index:5;background:linear-gradient(90deg,transparent,rgba(255,255,255,.8),transparent);filter:blur(2px);animation:home-challenge-sweep 1.35s cubic-bezier(.2,.75,.25,1) both}
+.home-challenge[data-celebrating=true] .home-challenge-icon{animation:home-challenge-symbol 1s cubic-bezier(.2,.8,.25,1) both}
+.home-challenge[data-celebrating=true] .home-challenge-label{animation:home-challenge-label 1.2s ease both}
+@keyframes home-challenge-sweep{0%{opacity:0;transform:translateX(0)}20%{opacity:1}100%{opacity:0;transform:translateX(420%)}}
+@keyframes home-challenge-symbol{0%{opacity:.3;transform:rotate(-14deg) scale(.72)}48%{transform:rotate(4deg) scale(1.1)}100%{opacity:1;transform:none}}
+@keyframes home-challenge-label{0%{opacity:0;transform:translateY(5px)}35%,100%{opacity:1;transform:none}}
+@keyframes home-challenge-strike{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@media(prefers-reduced-motion:reduce){.home-challenge,.home-challenge-icon,.home-challenge-label{transition:none!important;animation:none!important}.home-challenge-sweep{display:none}}
 .hero{font-size:clamp(3rem,7vw,4.5rem);font-weight:650;line-height:.98;letter-spacing:-.055em}.title{font-size:clamp(2.4rem,7vw,3.5rem);font-weight:650;line-height:1;letter-spacing:-.045em}.subtitle{margin-top:1rem;color:#57534e;line-height:1.7}.tag{display:inline-flex;align-items:center;gap:.5rem;margin-bottom:1.25rem;border-radius:999px;background:#d1fae5;padding:.4rem .75rem;font-size:.75rem;font-weight:700;color:#065f46}.primary,.next{margin-top:2rem;display:flex;height:3.5rem;align-items:center;justify-content:space-between;border:0;border-radius:1rem;background:#065f46;padding:0 1.25rem;color:white;font-weight:700}.primary{width:min(100%,18rem)}.next{margin-top:0;flex:1}.next:disabled{opacity:.4;cursor:not-allowed}.card{border-radius:2rem;background:white;padding:1.5rem;box-shadow:0 25px 60px #1c191711}.eyebrow{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#a8a29e}.option{display:flex;align-items:center;gap:1rem;margin-top:1rem;border-radius:1rem;background:#fafaf9;padding:1rem}.option span{display:grid;width:2.25rem;height:2.25rem;place-items:center;border-radius:.75rem;background:#d1fae5;color:#065f46;font-weight:800}.field{display:block;margin-top:1.25rem;font-size:.875rem;font-weight:700}.field input{display:block;width:100%;height:3.5rem;margin-top:.5rem;border:1px solid #e7e5e4;border-radius:1rem;padding:0 1rem;font-size:1rem;outline:none}.field input:focus{border-color:#047857;box-shadow:0 0 0 4px #d1fae5}.choice{display:flex;width:100%;flex-direction:column;gap:.3rem;margin-top:.75rem;border:1px solid #e7e5e4;border-radius:1rem;background:white;padding:1rem;text-align:left}.choice small{color:#78716c}.choice.selected{border-color:#047857;background:#ecfdf5;box-shadow:0 0 0 3px #d1fae5}.notice,.error{margin-top:1rem;border-radius:1rem;padding:1rem;font-size:.875rem}.notice{background:#eff6ff;color:#1e40af}.error{background:#fff1f2;color:#be123c}.back{display:grid;width:3.5rem;height:3.5rem;place-items:center;border:1px solid #e7e5e4;border-radius:1rem;background:white}
 
 @keyframes kinetic-gradient{0%,100%{filter:hue-rotate(0deg);transform:translateY(0)}50%{filter:hue-rotate(18deg);transform:translateY(-.025em)}}

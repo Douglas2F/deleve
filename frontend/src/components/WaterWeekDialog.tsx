@@ -1,4 +1,4 @@
-import { Check, Droplets, Plus, X } from "lucide-react";
+import { Check, Droplets, MoreHorizontal, Plus, RotateCcw, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export type WaterWeekDay = {
@@ -42,6 +42,7 @@ export default function WaterWeekDialog({
   const [loading,setLoading] = useState(false);
   const [notice,setNotice] = useState("");
   const [confirmingReset,setConfirmingReset] = useState(false);
+  const [resetMenuOpen,setResetMenuOpen] = useState(false);
   const dateRequest = useRef(0);
   const mutation = useRef(false);
   const today = localDate();
@@ -50,6 +51,7 @@ export default function WaterWeekDialog({
     if (!open) return;
     const controller = new AbortController();
     setConfirmingReset(false);
+    setResetMenuOpen(false);
     setSelectedDate(today);setAmountMl("250");setError("");setNotice("");setWeek(initialWeek);setLoading(true);
     fetch("/api/health/water/week",{signal:controller.signal})
       .then(async response=>{if(!response.ok)throw new Error();return response.json()})
@@ -76,6 +78,7 @@ export default function WaterWeekDialog({
     if(!value||value>today){setError("Escolha hoje ou uma data anterior.");return}
     setSelectedDate(value);setError("");setNotice("");
     setConfirmingReset(false);
+    setResetMenuOpen(false);
     if(!error&&week?.days.some(day=>day.date===value))return;
     const requestId=++dateRequest.current;
     setLoading(true);setWeek(null);
@@ -172,7 +175,13 @@ export default function WaterWeekDialog({
 
             {selectedDay && <div className="mt-4 rounded-2xl bg-sky-50 p-4">
               <p className="text-sm font-bold text-stone-800">Adicionar em {formatSelectedDate(selectedDay.date)}</p>
-              <p className="mt-1 text-xs text-stone-500">Já registrado: {formatLiters(selectedDay.totalMl)}</p>
+              <div className="relative mt-1 flex min-h-9 items-center gap-2">
+                <p className="flex-1 text-xs text-stone-500">Já registrado: {formatLiters(selectedDay.totalMl)}</p>
+                {selectedDay.totalMl>0&&<button type="button" disabled={saving||loading} aria-label="Opções da água deste dia" aria-haspopup="menu" aria-expanded={resetMenuOpen} onClick={()=>{setResetMenuOpen(open=>!open);setConfirmingReset(false)}} className="grid min-h-9 min-w-9 place-items-center rounded-lg text-stone-500 hover:bg-white hover:text-sky-700 focus-visible:ring-2 focus-visible:ring-sky-300"><MoreHorizontal size={19}/></button>}
+                {resetMenuOpen&&<div role="menu" className="absolute right-0 top-9 z-10 min-w-52 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg">
+                  <button type="button" role="menuitem" onClick={()=>{setResetMenuOpen(false);setConfirmingReset(true)}} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-stone-700 hover:bg-stone-50 focus-visible:ring-2 focus-visible:ring-sky-300"><RotateCcw size={16}/>Zerar consumo do dia</button>
+                </div>}
+              </div>
               <div className="mt-3 flex items-end gap-2">
                 <label className="min-w-0 flex-1 text-xs font-semibold text-stone-600">Quantidade
                   <div className="mt-1 flex min-h-12 items-center rounded-xl bg-white px-3 ring-1 ring-stone-200 focus-within:ring-2 focus-within:ring-sky-400">
@@ -184,13 +193,10 @@ export default function WaterWeekDialog({
               </div>
             </div>}
 
-            {selectedDay&&selectedDay.totalMl>0&&<div className="mt-2">
-              {!confirmingReset?<button type="button" disabled={saving||loading} onClick={()=>{setConfirmingReset(true);setError("")}} className="min-h-11 rounded-lg px-1 text-xs text-stone-500 hover:text-sky-700 focus-visible:ring-2 focus-visible:ring-sky-300">Zerar</button>
-              :<div role="group" aria-label="Confirmar zerar água" className="rounded-xl bg-stone-50 p-3">
-                <p className="text-sm text-stone-700">Zerar a água de {formatSelectedDate(selectedDate)}?</p>
-                <p className="mt-1 text-xs text-stone-500">Os outros dias serão mantidos. Não há botão para desfazer.</p>
-                <div className="mt-2 flex gap-3"><button type="button" disabled={saving} onClick={()=>setConfirmingReset(false)} className="min-h-11 rounded-lg px-2 text-sm text-stone-600">Cancelar</button><button type="button" disabled={saving} onClick={()=>void resetDay()} className="min-h-11 rounded-lg px-3 text-sm font-semibold text-sky-700 hover:bg-sky-50">{saving?"Zerando…":"Zerar"}</button></div>
-              </div>}
+            {selectedDay&&selectedDay.totalMl>0&&confirmingReset&&<div role="group" aria-label="Confirmar zerar água" className="mt-3 rounded-xl border border-stone-200 bg-white p-3">
+              <p className="text-sm font-semibold text-stone-800">Zerar os {formatLiters(selectedDay.totalMl)} de {formatSelectedDate(selectedDate)}?</p>
+              <p className="mt-1 text-xs text-stone-500">Os outros dias serão mantidos. Não há botão para desfazer.</p>
+              <div className="mt-3 flex justify-end gap-2"><button type="button" disabled={saving} onClick={()=>setConfirmingReset(false)} className="min-h-11 rounded-lg px-3 text-sm text-stone-600">Cancelar</button><button type="button" disabled={saving} onClick={()=>void resetDay()} className="min-h-11 rounded-lg bg-rose-600 px-4 text-sm font-semibold text-white hover:bg-rose-700">{saving?"Zerando…":"Zerar"}</button></div>
             </div>}
 
             <p className="mt-4 text-xs leading-5 text-stone-500">{currentWeek?`A média considera ${week.elapsedDays} dia${week.elapsedDays===1?"":"s"}: de segunda-feira até hoje.`:"A média considera os 7 dias desta semana."}</p>

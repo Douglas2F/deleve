@@ -1,5 +1,12 @@
 # Relatório semanal
 
+## Menu padrão para zerar a água — 01/09/2026
+
+- O texto Zerar solto foi substituído por um botão discreto de três pontos ao lado de Já registrado.
+- O menu compacto contém apenas Zerar consumo do dia; a confirmação informa o total e a data selecionada.
+- Cores neutras no acesso e no menu; vermelho reservado somente ao botão final Zerar.
+- Fluxo conferido em 390 px com banco fictício, incluindo abertura, confirmação e cancelamento sem excluir dados. Build aprovado e 18 testes de água aprovados.
+
 ## Água simplificada: Zerar — 31/08/2026
 
 - Por preferência do usuário, lista de consumos retirada da interface. Apenas Zerar em texto cinza discreto abaixo da quantidade.
