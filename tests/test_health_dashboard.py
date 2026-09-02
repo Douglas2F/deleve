@@ -423,7 +423,27 @@ def test_latest_activity_returns_a_health_record(app, client):
     activity = client.get("/api/health/latest-activity").get_json()["activity"]
 
     assert activity["kind"] == "water"
+    assert activity["amountMl"] == 250
     assert activity["recordedAt"]
+
+
+def test_latest_activities_return_each_health_category(app, client):
+    from app.core.database import initialize_database
+
+    with app.app_context():
+        initialize_database()
+    client.post(
+        "/api/health/profile",
+        json={"name": "Douglas", "heightCm": "175", "weightKg": "78", "goals": ["Beber mais água", "Dormir melhor"], "waterGoalMl": "3000", "sleepGoalHours": "8"},
+    )
+    client.post("/api/health/water", json={"amountMl": 750})
+    client.post("/api/health/sleep", json={"bedtime": "22:30", "wakeTime": "06:30"})
+
+    activities = client.get("/api/health/latest-activities").get_json()["activities"]
+
+    assert activities["water"]["amountMl"] == 750
+    assert activities["water"]["recordedAt"]
+    assert activities["sleep"]["recordedAt"]
 
 
 def test_daily_focus_can_be_saved_completed_and_removed(app, client):

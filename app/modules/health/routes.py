@@ -30,7 +30,7 @@ from app.modules.health.water_service import (
 )
 from app.modules.health.weight_service import get_weight_summary, save_today_weight, change_weight_entry, WeightDateConflict, get_weight_chart
 from app.modules.health.weekly_report_service import get_weekly_health_report
-from app.modules.health.latest_activity_service import get_latest_health_activity
+from app.modules.health.latest_activity_service import get_latest_health_activities, get_latest_health_activity
 from app.modules.health.daily_focus_service import delete_today_focus, get_today_focus, save_today_focus, set_today_focus_completed
 from app.modules.health.records_service import records_preview, export_records, reset_records, RecordsChangedError
 
@@ -339,6 +339,11 @@ def read_weekly_health_report():
 @health_blueprint.get("/api/health/latest-activity")
 def read_latest_health_activity():
     return jsonify({"activity": get_latest_health_activity()})
+
+
+@health_blueprint.get("/api/health/latest-activities")
+def read_latest_health_activities():
+    return jsonify({"activities": get_latest_health_activities()})
 
 
 @health_blueprint.get("/api/health/focus/today")

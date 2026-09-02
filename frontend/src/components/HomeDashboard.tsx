@@ -251,8 +251,8 @@ export default function HomeDashboard({ profile, onOpenHealth, feedback, onFeedb
                 {challengeCelebrating && <span aria-hidden="true" className="home-challenge-sweep absolute inset-y-0 -left-1/3 w-1/3" />}
               </button>
               <span className="mt-2 grid grid-cols-2 gap-2 text-xs text-stone-700 sm:grid-cols-4">
-                <HealthCareRow icon={Droplets} label="Água" value={healthHasData ? formatWaterProgress(healthToday.waterTotalMl, waterGoalMl) : healthLoading ? "..." : "—"} done={healthHasData&&healthToday.waterTotalMl >= waterGoalMl} tone="water" announcement={feedback?.kind==="water"?feedback.message:achievementMessages.water} onClick={() => openHealth("water")} />
-                <HealthCareRow icon={MoonStar} label="Sono" value={!healthHasData ? healthLoading ? "..." : "—" : healthToday.sleepGoalReached ? formatCompactDuration(healthToday.sleepMinutes ?? 0) : "Pendente"} done={healthHasData&&healthToday.sleepGoalReached} tone="sleep" announcement={feedback?.kind==="sleep"?feedback.message:achievementMessages.sleep} onClick={() => openHealth("sleep")} />
+                <HealthCareRow icon={Droplets} label="Água" value={healthHasData ? formatWaterProgress(healthToday.waterTotalMl, waterGoalMl) : healthLoading ? "..." : "—"} done={healthHasData&&healthToday.waterTotalMl >= waterGoalMl} tone="water" announcement={feedback?.kind==="water"?feedback.message:achievementMessages.water} ariaLabel="Abrir painel de água" onClick={() => openHealth("water-panel")} />
+                <HealthCareRow icon={MoonStar} label="Sono" value={!healthHasData ? healthLoading ? "..." : "—" : healthToday.sleepMinutes === null ? "Pendente" : formatCompactDuration(healthToday.sleepMinutes)} done={healthHasData&&healthToday.sleepGoalReached} tone="sleep" announcement={feedback?.kind==="sleep"?feedback.message:achievementMessages.sleep} onClick={() => openHealth("sleep")} />
                 <HealthCareRow icon={Activity} label="Exercício" value={!healthHasData ? healthLoading ? "..." : "—" : healthToday.exerciseRecorded ? formatCompactDuration(healthToday.exerciseSeconds / 60) : "Pendente"} done={healthHasData&&healthToday.exerciseRecorded} tone="exercise" announcement={feedback?.kind==="exercise"?feedback.message:achievementMessages.exercise} onClick={() => openHealth("exercise")} />
                 <HealthCareRow icon={Scale} label="Peso" value={healthHasData ? weightProgress.value : healthLoading ? "..." : "—"} done={healthHasData&&weightProgress.favorable} tone="weight" announcement={feedback?.kind==="weight"?feedback.message:achievementMessages.weight} onClick={() => openHealth("weight")} />
               </span>
@@ -295,10 +295,10 @@ const careTones = {
 } as const;
 type CareTone = keyof typeof careTones;
 
-function HealthCareRow({ icon: Icon, label, value, done, tone, announcement, onClick }: { icon: typeof Droplets; label: string; value: string; done: boolean; tone: CareTone; announcement?: string; onClick: () => void }) {
+function HealthCareRow({ icon: Icon, label, value, done, tone, announcement, ariaLabel, onClick }: { icon: typeof Droplets; label: string; value: string; done: boolean; tone: CareTone; announcement?: string; ariaLabel?: string; onClick: () => void }) {
   const colors = careTones[tone];
   return (
-    <button type="button" onClick={onClick} aria-label={`Abrir registro de ${label.toLocaleLowerCase("pt-BR")}`} data-tone={tone} data-achieved={done} data-celebrating={Boolean(announcement)} className={`home-care-tile pointer-events-auto relative flex min-h-20 flex-col justify-between overflow-hidden rounded-xl border p-3 text-left outline-none transition hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-emerald-600 active:scale-[.98] ${colors.card} ${done ? "border-emerald-500/45 shadow-[0_7px_18px_rgba(5,150,105,.09)]" : ""}`}>
+    <button type="button" onClick={onClick} aria-label={ariaLabel ?? `Abrir registro de ${label.toLocaleLowerCase("pt-BR")}`} data-tone={tone} data-achieved={done} data-celebrating={Boolean(announcement)} className={`home-care-tile pointer-events-auto relative flex min-h-20 flex-col justify-between overflow-hidden rounded-xl border p-3 text-left outline-none transition hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-emerald-600 active:scale-[.98] ${colors.card} ${done ? "border-emerald-500/45 shadow-[0_7px_18px_rgba(5,150,105,.09)]" : ""}`}>
       <span className="flex items-center gap-2 pr-5">
         <span className={`grid size-7 shrink-0 place-items-center rounded-lg ${colors.icon}`}>
           <Icon size={14} aria-hidden="true" />
