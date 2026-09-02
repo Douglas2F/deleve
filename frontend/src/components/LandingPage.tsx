@@ -1,5 +1,5 @@
 import DeleveSymbol from "./DeleveSymbol";
-import { Activity, ArrowRight, BookOpen, Check, Droplets, GraduationCap, HeartPulse, Home, MoonStar } from "lucide-react";
+import { Activity, ArrowRight, BookOpen, Check, Droplets, GraduationCap, HeartPulse, Home, Landmark, MoonStar } from "lucide-react";
 import Brand from "./Brand";
 
 type LandingPageProps = { onStart: () => void };
@@ -23,8 +23,8 @@ export default function LandingPage({ onStart }: LandingPageProps) {
             <p id="module-list-title" className="px-3 text-[.68rem] font-bold uppercase tracking-[.18em] text-stone-400">Módulos</p>
             <div className="mt-3 space-y-1.5">
               <ModuleItem icon={<HeartPulse size={18} />} name="Saúde" detail="Disponível agora" active />
-              <ModuleItem icon={<GraduationCap size={18} />} name="Estudos" detail="Em breve" />
-              <ModuleItem icon={<BookOpen size={18} />} name="Leitura" detail="Em breve" />
+              <ModuleItem icon={<GraduationCap size={18} />} name="Estudos" detail="Disponível agora" active />
+              <ModuleItem icon={<Landmark size={18} />} name="Finanças" detail="Em breve" />
             </div>
           </section>
 

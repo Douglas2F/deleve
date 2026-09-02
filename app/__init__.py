@@ -4,6 +4,7 @@ from flask import Flask
 
 from app.core.database import init_app as init_database, initialize_database
 from app.modules.health.routes import health_blueprint
+from app.modules.studies.routes import studies_blueprint
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -21,6 +22,7 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     init_database(app)
     app.register_blueprint(health_blueprint)
+    app.register_blueprint(studies_blueprint)
 
     with app.app_context():
         initialize_database()

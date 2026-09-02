@@ -6,6 +6,7 @@ import type { HealthProfile, HealthShortcut, HomeFeedback } from "./Dashboard";
 type HomeDashboardProps = {
   profile: HealthProfile;
   onOpenHealth: (shortcut?: HealthShortcut) => void;
+  onOpenStudies: () => void;
   feedback: HomeFeedback | null;
   onFeedbackDone: () => void;
 };
@@ -44,12 +45,12 @@ const modules = [
   {
     id: "studies",
     title: "Estudos",
-    status: "Em breve",
+    status: "Disponível",
     icon: GraduationCap,
-    enabled: false,
-    surface: "from-violet-50 via-indigo-50 to-violet-100/80",
-    iconSurface: "from-indigo-600 to-violet-500",
-    glow: "bg-violet-300/30",
+    enabled: true,
+    surface: "from-slate-50 via-sky-50 to-cyan-100/80",
+    iconSurface: "from-blue-950 to-sky-600",
+    glow: "bg-sky-300/30",
   },
   {
     id: "finances",
@@ -73,7 +74,7 @@ const modules = [
   },
 ] as const;
 
-export default function HomeDashboard({ profile, onOpenHealth, feedback, onFeedbackDone }: HomeDashboardProps) {
+export default function HomeDashboard({ profile, onOpenHealth, onOpenStudies, feedback, onFeedbackDone }: HomeDashboardProps) {
   const firstName = profile.name.trim().split(" ")[0] || "você";
   const waterGoalMl = Math.max(Number(profile.waterGoalMl) || 2_000, 1);
   const sleepGoalMinutes = Math.max(Number(profile.sleepGoalHours) || 8, 1) * 60;
@@ -263,13 +264,14 @@ export default function HomeDashboard({ profile, onOpenHealth, feedback, onFeedb
             {modules.filter(module => module.id !== "health").map(module => {
               const Icon = module.icon;
               return (
-                <article key={module.id} aria-label={`${module.title}, em breve`} className={`relative flex min-h-20 items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br ${module.surface} p-4 shadow-[0_9px_24px_rgba(20,58,48,.06)]`}>
+                <article key={module.id} aria-label={`${module.title}, ${module.status.toLocaleLowerCase("pt-BR")}`} className={`group relative flex min-h-20 items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br ${module.surface} p-4 shadow-[0_9px_24px_rgba(20,58,48,.06)] ${module.enabled?"transition hover:-translate-y-0.5 hover:shadow-md":""}`}>
+                  {module.id==="studies"&&<button type="button" onClick={onOpenStudies} aria-label="Abrir módulo Estudos" className="absolute inset-0 z-0 rounded-2xl outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-sky-500"/>}
                   <span className={`pointer-events-none absolute -right-10 -top-10 size-24 rounded-full ${module.glow} blur-xl`} />
-                  <span className={`relative grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${module.iconSurface} text-white shadow-md shadow-stone-900/10`}>
+                  <span className={`pointer-events-none relative z-10 grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${module.iconSurface} text-white shadow-md shadow-stone-900/10`}>
                     <Icon size={19} aria-hidden="true" />
                   </span>
-                  <strong className="relative min-w-0 flex-1 text-base font-semibold tracking-tight">{module.title}</strong>
-                  <small className="relative shrink-0 rounded-full bg-white/75 px-2.5 py-1 text-[.65rem] font-bold text-stone-500">Em breve</small>
+                  <strong className="pointer-events-none relative z-10 min-w-0 flex-1 text-base font-semibold tracking-tight">{module.title}</strong>
+                  <small className={`pointer-events-none relative z-10 shrink-0 rounded-full bg-white/75 px-2.5 py-1 text-[.65rem] font-bold ${module.enabled?"text-blue-800":"text-stone-500"}`}>{module.status}</small>
                 </article>
               );
             })}

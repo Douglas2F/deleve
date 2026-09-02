@@ -2,7 +2,7 @@
 
 **Sua rotina, do seu jeito.**
 
-Aplicação web modular e mobile-first para acompanhar hábitos com poucos toques. O primeiro módulo em desenvolvimento é **Saúde**.
+Aplicação web modular e mobile-first para acompanhar saúde e estudos com poucos toques.
 
 ## Funcionalidades atuais
 
@@ -14,6 +14,9 @@ Aplicação web modular e mobile-first para acompanhar hábitos com poucos toque
 - histórico de peso e evolução desde o primeiro registro;
 - relatório semanal consolidado;
 - edição e exclusão de registros;
+- planejamento de estudos por matérias ou cursos;
+- tarefas de estudo, leitura, aula, exercícios e revisão;
+- duração planejada e acompanhamento das tarefas do dia;
 - validações no frontend e no backend.
 
 ## Tecnologias
@@ -29,8 +32,8 @@ Aplicação web modular e mobile-first para acompanhar hábitos com poucos toque
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements-dev.txt
-python -m flask --app run init-db
-python -m flask --app run run
+python -m flask --app app:create_app init-db
+python -m flask --app app:create_app run
 ```
 
 O backend ficará disponível em `http://127.0.0.1:5000`.
@@ -67,4 +70,4 @@ O banco SQLite, o ambiente virtual, dependências instaladas e arquivos de build
 
 ## Estado do projeto
 
-Versão inicial funcional do módulo Saúde. Os próximos módulos previstos são Estudos, Leitura e Rotina.
+Módulo Saúde funcional e primeira versão do módulo Estudos disponível. Os próximos módulos previstos são Finanças e Rotina.

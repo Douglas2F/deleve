@@ -79,3 +79,43 @@ CREATE TABLE IF NOT EXISTS health_daily_focus (
  FOREIGN KEY (profile_id) REFERENCES health_profiles (id),
  UNIQUE (profile_id, focus_date)
 );
+
+CREATE TABLE IF NOT EXISTS study_subjects (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ profile_id INTEGER NOT NULL,
+ name TEXT NOT NULL,
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY (profile_id) REFERENCES health_profiles (id),
+ UNIQUE (profile_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS study_tasks (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ profile_id INTEGER NOT NULL,
+ subject_id INTEGER,
+ title TEXT NOT NULL,
+ task_type TEXT NOT NULL DEFAULT 'Estudo',
+ task_date TEXT NOT NULL,
+ planned_minutes INTEGER NOT NULL CHECK (planned_minutes BETWEEN 5 AND 480),
+ completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY (profile_id) REFERENCES health_profiles (id),
+ FOREIGN KEY (subject_id) REFERENCES study_subjects (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_study_tasks_profile_date
+ON study_tasks (profile_id, task_date);
+
+CREATE TABLE IF NOT EXISTS study_sessions (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ profile_id INTEGER NOT NULL,
+ task_id INTEGER NOT NULL,
+ duration_seconds INTEGER NOT NULL CHECK (duration_seconds BETWEEN 1 AND 28800),
+ completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY (profile_id) REFERENCES health_profiles (id),
+ FOREIGN KEY (task_id) REFERENCES study_tasks (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_study_sessions_task
+ON study_sessions (task_id, completed_at);
