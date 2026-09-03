@@ -30,6 +30,8 @@ type StudyTask = {
   completed: boolean;
   subject: { id: number; name: string } | null;
 };
+type StudySessionEntry = { id: number; durationSeconds: number; completedAt: string };
+type SessionsByTask = { taskId: number; title: string; type: string; subject: { id: number; name: string } | null; plannedMinutes: number; studiedSeconds: number; sessions: StudySessionEntry[] };
 type StudiesOverview = {
   date: string;
   tasks: StudyTask[];
@@ -58,6 +60,7 @@ export default function StudiesDashboard({ profile, onBackHome }: { profile: Hea
   const [taskDialog, setTaskDialog] = useState<StudyTask | "new" | null>(null);
   const [subjectDialogOpen, setSubjectDialogOpen] = useState(false);
   const [focusSession, setFocusSession] = useState<StudyTask | null>(null);
+  const [sessions, setSessions] = useState<SessionsByTask[]>([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const [savingSession, setSavingSession] = useState(false);
@@ -202,6 +205,26 @@ export default function StudiesDashboard({ profile, onBackHome }: { profile: Hea
             <p className="mt-3 text-xs font-medium text-stone-500">{overview.completedCount} de {overview.tasks.length} tarefa{overview.tasks.length === 1 ? "" : "s"} concluída{overview.completedCount === 1 ? "" : "s"}</p>
           </article>
         </section>
+        {sessions.length > 0 && <section className="mt-6" aria-labelledby="study-sessions-title">
+          <div><p className="text-xs font-bold uppercase tracking-[.14em] text-stone-400">Histórico do dia</p><h2 id="study-sessions-title" className="mt-1 text-xl font-semibold">Sessões de hoje</h2></div>
+          <ul className="mt-3 space-y-2">
+            {sessions.map(item => <li key={item.taskId} className="rounded-2xl border border-sky-100 bg-white/80 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <strong className="block truncate text-sm font-semibold">{item.title}</strong>
+                  <p className="mt-0.5 text-[11px] text-stone-500">{item.subject?.name ?? "Estudos"} · {formatStudyTime(item.studiedSeconds)} de {formatMinutes(item.plannedMinutes)}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-blue-800">{item.sessions.length} {item.sessions.length === 1 ? "sessão" : "sessões"}</span>
+              </div>
+              <ul className="mt-2 space-y-1 border-t border-sky-100 pt-2">
+                {item.sessions.map(sess => <li key={sess.id} className="flex items-center justify-between text-[11px] text-stone-600">
+                  <span className="font-mono">{formatClockTime(sess.completedAt)}</span>
+                  <span className="font-semibold text-blue-900">{formatStudyTime(sess.durationSeconds)}</span>
+                </li>)}
+              </ul>
+            </li>)}
+          </ul>
+        </section>}
 
         <section className="mt-7" aria-labelledby="study-plan-title">
           <div className="flex items-center justify-between gap-3">
@@ -326,3 +349,10 @@ function formatTimer(seconds: number) { const hours = Math.floor(seconds / 3600)
 function localDateKey() { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`; }
 function messageFrom(caught: unknown) { return caught instanceof Error ? caught.message : "Não foi possível concluir. Tente novamente."; }
 async function request<T = unknown>(url: string, options?: RequestInit): Promise<T> { const response = await fetch(url, options); const body = await response.json().catch(() => ({})) as T & { error?: string }; if (!response.ok) throw new Error(body.error ?? "Não foi possível concluir. Tente novamente."); return body; }
+
+
+function formatClockTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}

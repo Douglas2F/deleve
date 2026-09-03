@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, time, timedelta
 
 from app.core.database import get_database
 
@@ -242,19 +242,63 @@ def delete_task(task_id: int) -> bool:
 
 def record_session(task_id: int, data: dict) -> dict:
     profile_id = _profile_id()
-    get_task(task_id)
+    current = get_task(task_id)
     duration_seconds = _seconds(data.get("durationSeconds"))
     database = get_database()
     database.execute(
         "INSERT INTO study_sessions (profile_id, task_id, duration_seconds) VALUES (?, ?, ?)",
         (profile_id, task_id, duration_seconds),
     )
-    database.execute(
-        "UPDATE study_tasks SET completed = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND profile_id = ?",
-        (task_id, profile_id),
-    )
+    new_studied = current["studiedSeconds"] + duration_seconds
+    if new_studied >= current["plannedMinutes"] * 60:
+        database.execute(
+            "UPDATE study_tasks SET completed = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND profile_id = ?",
+            (task_id, profile_id),
+        )
     database.commit()
     return get_task(task_id)
+
+
+def sessions_for_date(target_date: str | None = None) -> dict:
+    selected_date = _date(target_date)
+    profile_id = _profile_id()
+    tz_offset = timedelta(seconds=-datetime.now().astimezone().utcoffset().total_seconds()) if datetime.now().astimezone().utcoffset() else timedelta(0)
+    local_start = datetime.combine(date.fromisoformat(selected_date), time.min)
+    local_end = datetime.combine(date.fromisoformat(selected_date), time.max)
+    start_utc = (local_start + tz_offset).isoformat(sep=" ", timespec="seconds")
+    end_utc = (local_end + tz_offset).isoformat(sep=" ", timespec="seconds")
+    rows = get_database().execute(
+        """
+        SELECT session.id, session.duration_seconds, session.completed_at,
+               task.id AS task_id, task.title AS task_title, task.task_type,
+               task.planned_minutes,
+               subject.id AS subject_id, subject.name AS subject_name
+        FROM study_sessions session
+        JOIN study_tasks task ON task.id = session.task_id
+        LEFT JOIN study_subjects subject ON subject.id = task.subject_id
+        WHERE session.profile_id = ? AND session.completed_at BETWEEN ? AND ?
+        ORDER BY task.id, session.completed_at
+        """,
+        (profile_id, start_utc, end_utc),
+    ).fetchall()
+    grouped: dict[int, dict] = {}
+    for row in rows:
+        entry = grouped.setdefault(row["task_id"], {
+            "taskId": row["task_id"],
+            "title": row["task_title"],
+            "type": row["task_type"],
+            "subject": {"id": row["subject_id"], "name": row["subject_name"]} if row["subject_id"] else None,
+            "plannedMinutes": row["planned_minutes"],
+            "studiedSeconds": 0,
+            "sessions": [],
+        })
+        entry["studiedSeconds"] += row["duration_seconds"]
+        entry["sessions"].append({
+            "id": row["id"],
+            "durationSeconds": row["duration_seconds"],
+            "completedAt": row["completed_at"],
+        })
+    return {"date": selected_date, "items": list(grouped.values())}
 
 
 def overview(task_date: str | None = None) -> dict:

@@ -7,6 +7,7 @@ from app.modules.studies.service import (
     delete_task,
     overview,
     record_session,
+    sessions_for_date,
     update_task,
 )
 
@@ -72,5 +73,13 @@ def save_study_session(task_id: int):
         return jsonify(record_session(task_id, request.get_json(silent=True) or {})), 201
     except LookupError as error:
         return jsonify({"error": str(error)}), 404
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+
+@studies_blueprint.get("/api/studies/sessions")
+def read_study_sessions():
+    try:
+        return jsonify(sessions_for_date(request.args.get("date")))
     except ValueError as error:
         return jsonify({"error": str(error)}), 400

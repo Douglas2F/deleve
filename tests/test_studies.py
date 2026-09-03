@@ -112,7 +112,7 @@ def test_subject_with_tasks_must_be_emptied_before_deletion(client):
     assert deleted.get_json()["deleted"] is True
 
 
-def test_records_study_session_and_completes_task(client):
+def test_records_study_session_below_planned(client):
     create_profile(client)
     task_id = client.post(
         "/api/studies/tasks",
@@ -126,23 +126,67 @@ def test_records_study_session_and_completes_task(client):
     overview = client.get("/api/studies/overview").get_json()
 
     assert session.status_code == 201
-    assert session.get_json()["completed"] is True
+    assert session.get_json()["completed"] is False
     assert session.get_json()["studiedSeconds"] == 125
     assert overview["studiedSeconds"] == 125
-    assert overview["completedCount"] == 1
+    assert overview["completedCount"] == 0
 
 
-def test_rejects_invalid_study_session_duration(client):
+def test_session_below_planned_keeps_task_open(client):
     create_profile(client)
     task_id = client.post(
         "/api/studies/tasks",
-        json={"title": "Estudar inglês", "plannedMinutes": 20},
+        json={"title": "Estudar história", "plannedMinutes": 30},
     ).get_json()["id"]
 
     response = client.post(
         f"/api/studies/tasks/{task_id}/sessions",
-        json={"durationSeconds": 0},
+        json={"durationSeconds": 300},
     )
 
-    assert response.status_code == 400
-    assert "tempo" in response.get_json()["error"].lower()
+    assert response.status_code == 201
+    payload = response.get_json()
+    assert payload["completed"] is False
+    assert payload["studiedSeconds"] == 300
+    overview = client.get("/api/studies/overview").get_json()
+    assert overview["completedCount"] == 0
+    assert overview["studiedSeconds"] == 300
+
+
+def test_session_meeting_planned_completes_task(client):
+    create_profile(client)
+    task_id = client.post(
+        "/api/studies/tasks",
+        json={"title": "Revisar matéria", "plannedMinutes": 20},
+    ).get_json()["id"]
+
+    response = client.post(
+        f"/api/studies/tasks/{task_id}/sessions",
+        json={"durationSeconds": 1200},
+    )
+
+    assert response.status_code == 201
+    assert response.get_json()["completed"] is True
+    assert response.get_json()["studiedSeconds"] == 1200
+
+
+def test_sessions_endpoint_groups_by_task(client):
+    create_profile(client)
+    task_id = client.post(
+        "/api/studies/tasks",
+        json={"title": "Estudar física", "plannedMinutes": 60},
+    ).get_json()["id"]
+
+    client.post(f"/api/studies/tasks/{task_id}/sessions", json={"durationSeconds": 600})
+    client.post(f"/api/studies/tasks/{task_id}/sessions", json={"durationSeconds": 300})
+
+    response = client.get("/api/studies/sessions")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["items"]) == 1
+    item = payload["items"][0]
+    assert item["title"] == "Estudar física"
+    assert item["studiedSeconds"] == 900
+    assert len(item["sessions"]) == 2
+
+
