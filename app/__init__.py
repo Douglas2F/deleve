@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from flask import Flask
@@ -12,7 +13,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_mapping(
         DATABASE=Path(app.instance_path) / "assistant.sqlite3",
-        SECRET_KEY="development-only-change-me",
+        SECRET_KEY=os.getenv("SECRET_KEY", "development-only-change-me"),
     )
 
     if test_config:
